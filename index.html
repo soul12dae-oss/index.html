@@ -18,13 +18,22 @@
         button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button.btn-danger { background: #dc3545; }
         
-        .status-container { max-width: 800px; }
-        .log-item { background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 5px solid #ccc; }
-        .log-item.in { border-left-color: #0d6efd; }
-        .log-item.out { border-left-color: #dc3545; }
-        .log-header { display: flex; justify-content: space-between; font-size: 13px; color: #6c757d; margin-bottom: 6px; }
-        .log-body { font-size: 16px; font-weight: bold; }
-        .log-note { font-size: 14px; color: #495057; margin-top: 6px; background: #f8f9fa; padding: 6px; border-radius: 4px; }
+        /* 폰/모바일 최적화 접이식 현황판 스타일 */
+        .status-container { max-width: 600px; }
+        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; }
+        .item-header { padding: 16px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; font-weight: bold; font-size: 16px; }
+        .item-info { display: flex; align-items: center; gap: 10px; }
+        .stock-badge { background: #e2e3e5; padding: 4px 8px; border-radius: 4px; font-size: 13px; color: #495057; }
+        .edit-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        
+        /* 클릭 시 열리는 상세 내역 */
+        .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
+        .history-content.show { display: block; }
+        .log-row { padding: 8px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: flex-start; }
+        .log-row:last-child { border-bottom: none; }
+        .log-txt { font-weight: 500; }
+        .log-time { font-size: 12px; color: #6c757d; text-align: right; }
+        .log-note { font-size: 12px; color: #757575; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e9ecef; margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -88,15 +97,17 @@
 
     <!-- 4. 전체 현황 화면 -->
     <div id="status" class="tab-content status-container">
-        <h2>입출고 현황 리스트</h2>
-        <div id="logList"></div>
+        <h2>전체 물품 현황 (이름순)</h2>
+        <p style="font-size:12px; color:#6c757d; margin-top:-10px;">* 물품 목록을 누르면 상세 입출고 시간이 열립니다.</p>
+        <div id="itemStatusList">
+            <!-- 물품 이름순 정렬 카드들이 여기에 출력됩니다 -->
+        </div>
     </div>
 
     <script>
         const BASE_URL = "https://kvfdfdcaidsdnohfcbeg.supabase.co/rest/v1";
         const API_KEY = "sb_publishable_AzZQ-7pqFS2klriLNXlCig_xRs8b1vV";
 
-        // 공통 헤더 설정 (Supabase 인증 우회 및 자격 증명 포함)
         const headers = {
             "apikey": API_KEY,
             "Authorization": `Bearer ${API_KEY}`,
@@ -115,11 +126,10 @@
             document.getElementById(tabId).classList.add('active');
             document.getElementById(`btn-${tabId}`).classList.add('active-btn');
             
-            if(tabId === 'status') loadLogs();
+            if(tabId === 'status') loadInventoryStatus();
             if(tabId === 'inflow' || tabId === 'outflow') loadItems();
         }
 
-        // 물품 목록 가져오기
         async function loadItems() {
             try {
                 const response = await fetch(`${BASE_URL}/items?select=name&order=name.asc`, { headers });
@@ -136,7 +146,7 @@
                 inSelect.innerHTML = options;
                 outSelect.innerHTML = options;
             } catch (error) {
-                console.error("물품 로드 실패:", error);
+                console.error(error);
             }
         }
 
@@ -157,7 +167,7 @@
                 if (!response.ok) {
                     const errData = await response.json();
                     if(errData.code === '23505') throw new Error('이미 등록된 물품입니다.');
-                    throw new Error(errData.message || '등록에 실패했습니다.');
+                    throw new Error(errData.message);
                 }
 
                 alert(`[${name}] 등록 완료!`);
@@ -169,7 +179,7 @@
             }
         }
 
-        // 2 & 3. 입고 및 출고 기록
+        // 2 & 3. 입고 및 출고
         async function logStock(type) {
             const prefix = type === '입고' ? 'in' : 'out';
             const itemName = document.getElementById(`${prefix}ItemSelect`).value;
@@ -186,10 +196,7 @@
                     body: JSON.stringify({ type, item_name: itemName, count, note })
                 });
 
-                if (!response.ok) {
-                    const errData = await response.json();
-                    throw new Error(errData.message || '기록에 실패했습니다.');
-                }
+                if (!response.ok) throw new Error('기록 실패');
 
                 alert(`${itemName} ${count}개 ${type} 완료!`);
                 document.getElementById(`${prefix}Count`).value = '';
@@ -199,43 +206,119 @@
             }
         }
 
-        // 4. 전체 현황 불러오기
-        async function loadLogs() {
-            const logList = document.getElementById('logList');
-            logList.innerHTML = '로딩 중...';
+        // 4. 물품 이름순 정렬 리스트 + 누르면 상세 정렬 및 수정 기능
+        async function loadInventoryStatus() {
+            const container = document.getElementById('itemStatusList');
+            container.innerHTML = '현황 로딩 중...';
 
             try {
-                const response = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
-                const data = await response.json();
+                // 물품 리스트와 입출고 로그 한 번에 다 긁어오기
+                const itemRes = await fetch(`${BASE_URL}/items?select=*&order=name.asc`, { headers });
+                const itemsData = await itemRes.json();
 
-                logList.innerHTML = '';
-                if(data.length === 0) {
-                    logList.innerHTML = '<p style="text-align:center; color:#888;">입출고 내역이 없습니다.</p>';
+                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
+                const logsData = await logRes.json();
+
+                container.innerHTML = '';
+                if(itemsData.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; color:#888;">등록된 물품이 없습니다.</p>';
                     return;
                 }
 
-                data.forEach(log => {
-                    const dt = new Date(log.created_at);
-                    const dateStr = dt.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                    const timeStr = dt.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
-
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = `log-item ${log.type === '입고' ? 'in' : 'out'}`;
+                // 각 물품별로 카드 그리기
+                itemsData.forEach(item => {
+                    // 해당 물품의 로그 필터링
+                    const itemLogs = logsData.filter(log => log.item_name === item.name);
                     
-                    itemDiv.innerHTML = `
-                        <div class="log-header">
-                            <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span>
-                            <span>${dateStr} ${timeStr}</span>
+                    // 현재 남은 재고 수량 계산 (입고 더하고 출고 빼기)
+                    let totalStock = 0;
+                    itemLogs.forEach(l => {
+                        if(l.type === '입고') totalStock += l.count;
+                        if(l.type === '출고') totalStock -= l.count;
+                    });
+
+                    const card = document.createElement('div');
+                    card.className = 'item-card';
+
+                    // 히스토리 내역 HTML 빌드
+                    let historyHtml = '';
+                    if(itemLogs.length === 0) {
+                        historyHtml = '<div style="color:#999; text-align:center; padding:10px;">입출고 내역이 없습니다.</div>';
+                    } else {
+                        itemLogs.forEach(log => {
+                            const dt = new Date(log.created_at);
+                            const dateStr = dt.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                            const timeStr = dt.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+                            historyHtml += `
+                                <div class="log-row">
+                                    <div>
+                                        <span class="log-txt" style="color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
+                                        <strong>${log.count}개</strong>
+                                        ${log.note ? `<div class="log-note">✏️ ${log.note}</div>` : ''}
+                                    </div>
+                                    <div class="log-time">${dateStr}<br>${timeStr}</div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    // 카드 본문 구성
+                    card.innerHTML = `
+                        <div class="item-header" onclick="toggleHistory(this)">
+                            <div class="item-info">
+                                <span class="item-title">${item.name}</span>
+                                <span class="stock-badge">재고: ${totalStock}개</span>
+                            </div>
+                            <button class="edit-btn" onclick="editItemName('${item.id}', '${item.name}', event)">이름 수정</button>
                         </div>
-                        <div class="log-body">
-                            ${log.item_name} : ${log.count}개
+                        <div class="history-content">
+                            <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:8px;">📋 입출고 내역 리스트 (최신순)</div>
+                            ${historyHtml}
                         </div>
-                        ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
                     `;
-                    logList.appendChild(itemDiv);
+                    container.appendChild(card);
                 });
+
             } catch (error) {
-                logList.innerHTML = '데이터를 불러오지 못했습니다: ' + error.message;
+                container.innerHTML = '현황 로드 실패: ' + error.message;
+            }
+        }
+
+        // 접이식 토글 기능
+        function toggleHistory(headerElement) {
+            const content = headerElement.nextElementSibling;
+            content.classList.toggle('show');
+        }
+
+        // 물품 이름 수정 기능
+        async function editItemName(id, oldName, event) {
+            event.stopPropagation(); // 카드 닫히는 현상 방지
+            
+            const newName = prompt(`[${oldName}]의 새로운 물품명을 입력하세요:`, oldName);
+            if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+
+            try {
+                // 1. 물품명 테이블 정보 업데이트
+                const res1 = await fetch(`${BASE_URL}/items?id=eq.${id}`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({ name: newName.trim() })
+                });
+
+                if(!res1.ok) throw new Error('이름 수정에 실패했습니다.');
+
+                // 2. 연결된 기존 입출고 기록들의 물품명도 일괄 업데이트
+                await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldName}`, {
+                    method: 'PATCH',
+                    headers,
+                    body: JSON.stringify({ item_name: newName.trim() })
+                });
+
+                alert('물품명이 성공적으로 수정되었습니다.');
+                loadInventoryStatus();
+            } catch (error) {
+                alert(error.message);
             }
         }
     </script>
