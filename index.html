@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>자재 입출고 관리 시스템</title>
-    <!-- Supabase CDN 라이브러리 로드 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
         .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; }
@@ -20,7 +18,6 @@
         button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button.btn-danger { background: #dc3545; }
         
-        /* 현황판 스타일 */
         .status-container { max-width: 800px; }
         .log-item { background: white; padding: 15px; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 5px solid #ccc; }
         .log-item.in { border-left-color: #0d6efd; }
@@ -92,24 +89,25 @@
     <!-- 4. 전체 현황 화면 -->
     <div id="status" class="tab-content status-container">
         <h2>입출고 현황 리스트</h2>
-        <div id="logList">
-            <!-- 실시간 데이터가 모바일 보기 편한 카드 형태로 출력됩니다 -->
-        </div>
+        <div id="logList"></div>
     </div>
 
     <script>
-        // ⚠️ 본인의 Supabase 주소와 API Key로 반드시 변경하세요.
-        const SUPABASE_URL = "https://kvfdfdcaidsdnohfcbeg.supabase.co";
-        const SUPABASE_KEY = "sb_publishable_AzZQ-7pqFS2klriLNXlCig_xRs8b1vV";
-        
-        const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const BASE_URL = "https://kvfdfdcaidsdnohfcbeg.supabase.co/rest/v1";
+        const API_KEY = "sb_publishable_AzZQ-7pqFS2klriLNXlCig_xRs8b1vV";
 
-        // 페이지 로드 시 물품 목록 가져오기
+        // 공통 헤더 설정 (Supabase 인증 우회 및 자격 증명 포함)
+        const headers = {
+            "apikey": API_KEY,
+            "Authorization": `Bearer ${API_KEY}`,
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        };
+
         window.onload = function() {
             loadItems();
         };
 
-        // 탭 전환 및 스타일 변경
         function openTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
             document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active-btn'));
@@ -121,44 +119,57 @@
             if(tabId === 'inflow' || tabId === 'outflow') loadItems();
         }
 
-        // DB에서 물품 목록 불러와 선택창에 반영
+        // 물품 목록 가져오기
         async function loadItems() {
-            const { data, error } = await supabase.from('items').select('name').order('name');
-            if (error) return console.error(error);
+            try {
+                const response = await fetch(`${BASE_URL}/items?select=name&order=name.asc`, { headers });
+                const data = await response.json();
 
-            const inSelect = document.getElementById('inItemSelect');
-            const outSelect = document.getElementById('outItemSelect');
-            
-            let options = '<option value="">물품을 선택하세요</option>';
-            data.forEach(item => {
-                options += `<option value="${item.name}">${item.name}</option>`;
-            });
-            
-            inSelect.innerHTML = options;
-            outSelect.innerHTML = options;
+                const inSelect = document.getElementById('inItemSelect');
+                const outSelect = document.getElementById('outItemSelect');
+                
+                let options = '<option value="">물품을 선택하세요</option>';
+                data.forEach(item => {
+                    options += `<option value="${item.name}">${item.name}</option>`;
+                });
+                
+                inSelect.innerHTML = options;
+                outSelect.innerHTML = options;
+            } catch (error) {
+                console.error("물품 로드 실패:", error);
+            }
         }
 
-        // 1. 물품 등록 기능
+        // 1. 물품 등록
         async function addItem() {
             const name = document.getElementById('itemName').value.trim();
             const memo = document.getElementById('itemMemo').value.trim();
             
             if(!name) return alert('물품명을 입력해주세요.');
 
-            const { error } = await supabase.from('items').insert([{ name, memo }]);
-            
-            if (error) {
-                if(error.code === '23505') alert('이미 등록된 물품입니다.');
-                else alert('등록 실패: ' + error.message);
-            } else {
+            try {
+                const response = await fetch(`${BASE_URL}/items`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ name, memo })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    if(errData.code === '23505') throw new Error('이미 등록된 물품입니다.');
+                    throw new Error(errData.message || '등록에 실패했습니다.');
+                }
+
                 alert(`[${name}] 등록 완료!`);
                 document.getElementById('itemName').value = '';
                 document.getElementById('itemMemo').value = '';
                 loadItems();
+            } catch (error) {
+                alert(error.message);
             }
         }
 
-        // 2 & 3. 입고 및 출고 저장 (날짜/시간은 DB에서 한국시간 기준으로 자동 처리됨)
+        // 2 & 3. 입고 및 출고 기록
         async function logStock(type) {
             const prefix = type === '입고' ? 'in' : 'out';
             const itemName = document.getElementById(`${prefix}ItemSelect`).value;
@@ -168,52 +179,64 @@
             if(!itemName) return alert('물품을 선택하세요.');
             if(!count || count <= 0) return alert('정확한 수량을 입력하세요.');
 
-            const { error } = await supabase.from('stock_logs').insert([{ type, item_name: itemName, count, note }]);
-            
-            if (error) {
-                alert('기록 실패: ' + error.message);
-            } else {
+            try {
+                const response = await fetch(`${BASE_URL}/stock_logs`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ type, item_name: itemName, count, note })
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.message || '기록에 실패했습니다.');
+                }
+
                 alert(`${itemName} ${count}개 ${type} 완료!`);
                 document.getElementById(`${prefix}Count`).value = '';
                 document.getElementById(`${prefix}Note`).value = '';
+            } catch (error) {
+                alert(error.message);
             }
         }
 
-        // 4. 전체 현황 불러오기 (모바일에 최적화된 타임라인 리스트 형태)
+        // 4. 전체 현황 불러오기
         async function loadLogs() {
             const logList = document.getElementById('logList');
             logList.innerHTML = '로딩 중...';
 
-            const { data, error } = await supabase.from('stock_logs').select('*').order('created_at', { ascending: false });
-            if (error) return logList.innerHTML = '데이터를 불러오지 못했습니다.';
+            try {
+                const response = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
+                const data = await response.json();
 
-            logList.innerHTML = '';
-            if(data.length === 0) {
-                logList.innerHTML = '<p style="text-align:center; color:#888;">입출고 내역이 없습니다.</p>';
-                return;
+                logList.innerHTML = '';
+                if(data.length === 0) {
+                    logList.innerHTML = '<p style="text-align:center; color:#888;">입출고 내역이 없습니다.</p>';
+                    return;
+                }
+
+                data.forEach(log => {
+                    const dt = new Date(log.created_at);
+                    const dateStr = dt.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                    const timeStr = dt.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
+
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = `log-item ${log.type === '입고' ? 'in' : 'out'}`;
+                    
+                    itemDiv.innerHTML = `
+                        <div class="log-header">
+                            <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span>
+                            <span>${dateStr} ${timeStr}</span>
+                        </div>
+                        <div class="log-body">
+                            ${log.item_name} : ${log.count}개
+                        </div>
+                        ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
+                    `;
+                    logList.appendChild(itemDiv);
+                });
+            } catch (error) {
+                logList.innerHTML = '데이터를 불러오지 못했습니다: ' + error.message;
             }
-
-            data.forEach(log => {
-                // UTC 시간을 현지(한국) 날짜 및 시간으로 분리 변환
-                const dt = new Date(log.created_at);
-                const dateStr = dt.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                const timeStr = dt.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
-
-                const itemDiv = document.createElement('div');
-                itemDiv.className = `log-item ${log.type === '입고' ? 'in' : 'out'}`;
-                
-                itemDiv.innerHTML = `
-                    <div class="log-header">
-                        <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span>
-                        <span>${dateStr} ${timeStr}</span>
-                    </div>
-                    <div class="log-body">
-                        ${log.item_name} : ${log.count}개
-                    </div>
-                    ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
-                `;
-                logList.appendChild(itemDiv);
-            });
         }
     </script>
 </body>
