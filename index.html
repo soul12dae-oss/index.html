@@ -16,7 +16,7 @@
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; }
         .form-group textarea { height: 60px; resize: none; }
         button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        button.btn-danger { background: #dc3545; }
+        button.btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; cursor: pointer; font-weight: bold; }
         
         /* 분류별 그룹 스타일 */
         .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; }
@@ -111,14 +111,13 @@
             <label>특이사항</label>
             <textarea id="outNote" placeholder="특이사항 입력 (생략 가능)"></textarea>
         </div>
-        <button class="btn btn-danger" onclick="logStock('출고')">출고 완료</button>
+        <button class="btn btn-danger" style="width:100%; padding:14px; font-size:16px;" onclick="logStock('출고')">출고 완료</button>
     </div>
 
     <!-- 4. 전체 현황 화면 -->
     <div id="status" class="tab-content">
         <h2>전체 현황판</h2>
         
-        <!-- [추가 기능] 전체현황에서 바로 분류 파일 추가 버튼 -->
         <div class="top-action-bar">
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
@@ -141,7 +140,6 @@
             "Prefer": "return=representation"
         };
 
-        // 전역 가상 카테고리 목록 보관용
         let globalCategories = ['기본분류'];
 
         window.onload = function() {
@@ -175,7 +173,11 @@
             try {
                 const response = await fetch(`${BASE_URL}/items?select=category`, { headers });
                 const data = await response.json();
-                globalCategories = ['기본분류', ...new Set(data.map(item => item.category).filter(Boolean))];
+                
+                // [해결] 공백 제거 및 완벽한 중복 제거 필터링
+                const dbCats = data.map(item => item.category ? item.category.trim() : '기본분류');
+                const uniqueCats = [...new Set(['기본분류', ...dbCats])];
+                globalCategories = uniqueCats;
                 
                 const select = document.getElementById('itemCategorySelect');
                 if(select) {
@@ -256,7 +258,6 @@
             } catch (error) { alert(error.message); }
         }
 
-        // [기능 추가] 전체현황판에서 바로 새 파일(분류) 정의하기
         function createNewCategoryFromStatus() {
             const newCatName = prompt('새로 만들 분류 파일(폴더) 이름을 지정하세요:');
             if(!newCatName || newCatName.trim() === '') return;
@@ -267,7 +268,7 @@
             }
             
             globalCategories.push(target);
-            alert(`[${target}] 분류가 가상 생성되었습니다. 아래 물품들에서 [이동] 버튼을 눌러 이 폴더로 집어넣으실 수 있습니다.`);
+            alert(`[${target}] 분류가 추가되었습니다. 물품의 [이동/빼기] 버튼으로 분류를 지정해 주세요.`);
             loadInventoryStatus();
         }
 
@@ -285,24 +286,21 @@
 
                 container.innerHTML = '';
 
-                // DB에 잡힌 분류 리스트와 새로 가상 추가된 분류까지 동기화 통합
-                const activeDbCategories = [...new Set(itemsData.map(item => item.category).filter(Boolean))];
-                const allCategories = [...new Set([...globalCategories, ...activeDbCategories])];
+                // [해결] 중복 결합 방지 로직 보완
+                const activeDbCategories = itemsData.map(item => item.category ? item.category.trim() : '기본분류');
+                const allCategories = [...new Set([...globalCategories, ...activeDbCategories])].filter(Boolean);
 
-                // 분류별로 데이터를 세팅
                 const groups = {};
                 allCategories.forEach(c => groups[c] = []);
                 itemsData.forEach(item => {
-                    const cat = item.category || '기본분류';
+                    const cat = item.category ? item.category.trim() : '기본분류';
                     if(!groups[cat]) groups[cat] = [];
                     groups[cat].push(item);
                 });
 
-                // 분류 묶음별 화면 렌더링
                 for (const catName of allCategories) {
                     const matchedItems = groups[catName] || [];
                     
-                    // 빈 분류이고 '기본분류'가 아니라면 내역 없다는 표시와 함께 빈 폴더 제공
                     if(matchedItems.length === 0 && catName === '기본분류') continue;
 
                     const section = document.createElement('div');
@@ -362,12 +360,13 @@
                                     <span class="stock-badge">재고: ${totalStock}개</span>
                                 </div>
                                 <div class="action-container">
-                                    <!-- [추가 기능] 분류 바꾸기(넣고 빼기) 버튼 -->
                                     <button class="move-folder-btn" onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 이동/빼기</button>
                                     <div class="order-btn-set">
                                         <button onclick="moveOrder('${item.id}', ${item.sort_order}, '${prevId}', ${prevOrder}, event)">▲</button>
                                         <button onclick="moveOrder('${item.id}', ${item.sort_order}, '${nextId}', ${nextOrder}, event)">▼</button>
                                     </div>
+                                    <!-- [기능 추가] 물품 완전히 삭제하는 버튼 부착 -->
+                                    <button class="btn-danger" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">삭제</button>
                                 </div>
                             </div>
                             <div class="history-content">
@@ -386,11 +385,33 @@
             headerElement.nextElementSibling.classList.toggle('show');
         }
 
-        /* [기능 추가] 물품을 다른 분류 파일에 넣고 빼는 기능 */
-        async function moveItemCategory(itemId, itemName, currentCat, event) {
-            event.stopPropagation(); // 아코디언 열림 방지
+        /* [기능 추가] 서버에서 물품을 완전히 삭제하는 함수 */
+        async function deleteItemFromServer(itemId, itemName, event) {
+            event.stopPropagation(); // 카드 열림 방지
 
-            // 현재 준비된 모든 폴더 리스트 문구 만들기
+            // 브라우저 경고 문구 작동
+            const isConfirmed = confirm(`⚠️ 정말로 [ ${itemName} ] 물품을 완전히 삭제하시겠습니까?\n삭제하시면 되돌릴 수 없습니다.`);
+            
+            if (!isConfirmed) return; // '취소' 누르면 패스
+
+            try {
+                const res = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
+                    method: 'DELETE',
+                    headers
+                });
+
+                if (!res.ok) throw new Error('삭제 실패');
+                
+                alert(`[ ${itemName} ] 물품이 정상적으로 삭제되었습니다.`);
+                loadInventoryStatus(); // 새로고침 없이 리스트 즉시 리로드
+            } catch (e) {
+                alert('오류 발생: ' + e.message);
+            }
+        }
+
+        async function moveItemCategory(itemId, itemName, currentCat, event) {
+            event.stopPropagation();
+
             let catListTxt = globalCategories.map((c, i) => `${i + 1}. ${c}`).join('\n');
             const choice = prompt(`[${itemName}] 물품을 이동할 분류 파일 번호를 입력하세요:\n\n${catListTxt}\n\n(※ 기본분류로 빼고 싶다면 '기본분류' 번호를 선택하세요)`);
             
