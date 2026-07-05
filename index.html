@@ -137,7 +137,7 @@
 
         let globalCategories = ['기본분류'];
 
-        // 무조건 탭 전환이 우선 작동하도록 에러 차단 방어막 설치
+        // 상단 네비게이션 전환 기능 - 무조건 최우선 작동 (보장 기능)
         function openTab(tabId) {
             try {
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -153,13 +153,15 @@
                 if(tabId === 'status') loadInventoryStatus();
                 if(tabId === 'inflow' || tabId === 'outflow') loadItems();
             } catch (err) {
-                console.error("Tab 스위칭 오류 무시 처리:", err);
+                console.error("탭 이동 오류 무시:", err);
             }
         }
 
         window.onload = function() {
-            loadItems();
-            loadCategories();
+            try {
+                loadItems();
+                loadCategories();
+            } catch(e) { console.error("초기 로딩 무시:", e); }
         };
 
         function checkNewCategory(select) {
@@ -183,7 +185,7 @@
                 if(!response.ok) return;
                 const data = await response.json();
                 
-                const dbCats = data.map(item => normalizeCategory(item.category));
+                const dbCats = Array.isArray(data) ? data.map(item => normalizeCategory(item.category)) : [];
                 const uniqueCats = [...new Set(['기본분류', ...dbCats])];
                 globalCategories = uniqueCats;
                 
@@ -204,7 +206,9 @@
                 if(!response.ok) return;
                 const data = await response.json();
                 let options = '<option value="">물품을 선택하세요</option>';
-                data.forEach(item => { if(item && item.name) options += `<option value="${item.name}">${item.name}</option>`; });
+                if(Array.isArray(data)){
+                    data.forEach(item => { if(item && item.name) options += `<option value="${item.name}">${item.name}</option>`; });
+                }
                 
                 const inSel = document.getElementById('inItemSelect');
                 const outSel = document.getElementById('outItemSelect');
@@ -239,14 +243,14 @@
                     body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
                 });
 
-                if (!response.ok) throw new Error('등록 오류 (보안 해제 재확인 필요)');
+                if (!response.ok) throw new Error('등록 오류');
 
                 alert(`[${category} > ${name}] 등록 완료!`);
                 document.getElementById('itemName').value = '';
                 document.getElementById('itemMemo').value = '';
                 newInput.value = '';
                 loadCategories();
-            } catch (error) { alert(error.message); }
+            } catch (error) { alert("서버 차단 또는 등록 실패: " + error.message); }
         }
 
         async function logStock(type) {
@@ -264,11 +268,11 @@
                     headers,
                     body: JSON.stringify({ type, item_name: itemName, count, note })
                 });
-                if (!response.ok) throw new Error('기록 실패 (보안 해제 재확인 필요)');
+                if (!response.ok) throw new Error('기록 실패');
                 alert(`${itemName} ${count}개 ${type} 완료!`);
                 document.getElementById(`${prefix}Count`).value = '';
                 document.getElementById(`${prefix}Note`).value = '';
-            } catch (error) { alert(error.message); }
+            } catch (error) { alert("처리 오류: " + error.message); }
         }
 
         function createNewCategoryFromStatus() {
@@ -292,15 +296,20 @@
             try {
                 const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
                 if (!itemRes.ok) {
-                    container.innerHTML = `<span style="color:red;">네트워크 서버 오류 (Supabase SQL 차단 상태일 수 있음)</span>`;
+                    container.innerHTML = `<span style="color:red; font-weight:bold;">⚠️ 데이터베이스 로드 실패 (SQL Editor 보안 해제 확인 필요)</span>`;
                     return;
                 }
                 const itemsData = await itemRes.json();
 
                 const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
-                const logsData = itemRes.ok ? await logRes.json() : [];
+                const logsData = logRes.ok ? await logRes.json() : [];
 
                 container.innerHTML = '';
+
+                if(!Array.isArray(itemsData) || itemsData.length === 0) {
+                    container.innerHTML = '<div style="color:#888; text-align:center; padding:20px;">등록된 자재 물품이 없습니다. 메인 탭에서 등록해 주세요.</div>';
+                    return;
+                }
 
                 itemsData.forEach(item => { item.category = normalizeCategory(item.category); });
 
@@ -392,7 +401,7 @@
                 }
             } catch (error) { 
                 console.error(error);
-                container.innerHTML = `<span style="color:red;">로드 중 오류 발생: ${error.message}</span>`;
+                container.innerHTML = `<span style="color:red;">화면 빌드 실패: ${error.message}</span>`;
             }
         }
 
