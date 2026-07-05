@@ -21,10 +21,10 @@
         button.btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; cursor: pointer; font-weight: bold; }
         
         /* 분류 파일 섹션 스타일 */
-        .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; position: relative; }
+        .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; position: relative; transition: all 0.2s; }
         .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* [개선] 더보기 메뉴 드롭다운 - 카드 밖으로 완벽하게 탈출하도록 고정형(fixed) 레이아웃 적용 */
+        /* 더보기 메뉴 드롭다운 fixed 레이아웃 */
         .more-menu-container { position: relative; display: inline-block; }
         .more-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; color: #6c757d; font-weight: bold; }
         .more-dropdown { display: none; position: fixed; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
@@ -32,14 +32,13 @@
         .more-dropdown button { width: 100%; padding: 11px 14px; border: none; background: white; text-align: left; font-size: 13px; cursor: pointer; color: #333; display: block; box-sizing: border-box; }
         .more-dropdown button:hover { background: #f1f3f5; }
         .more-dropdown button.del-action { color: #dc3545; }
-        .more-dropdown button.mode-active-btn { background: #e3f2fd; color: #0d6efd; font-weight: bold; }
         
-        /* [개선] 정렬 모드 활성화 시 직관적인 시각 피드백 추가 */
-        .sort-mode-folder-active { border: 2px solid #0d6efd !important; background: #f1f8ff !important; cursor: move !important; }
+        /* 정렬 활성화 상태 디자인 */
+        .sort-mode-folder-active { border: 2px dashed #0d6efd !important; background: #f1f8ff !important; cursor: move !important; }
         .sort-mode-item-active { border: 2px dashed #ffc107 !important; background: #fffde7 !important; cursor: move !important; }
 
         /* 물품 카드 스타일 */
-        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; position: relative; }
+        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; position: relative; transition: all 0.2s; }
         .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
         .item-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
         .stock-badge { background: #e2e3e5; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #111; border: 1px solid #ced4da; font-weight: 800; }
@@ -55,9 +54,16 @@
         .sm-edit-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; color: #495057; }
         .log-note { font-size: 12px; color: #6c757d; margin-top: 3px; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #e9ecef; }
         
-        .top-action-bar { display: flex; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
+        /* 상단 액션바 스타일 변경 */
+        .top-action-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
         .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
+        
+        /* 상단 정렬 전용 스위치 버튼 디자인 */
+        .toggle-sort-btn { background: #fff; color: #0d6efd; border: 2px solid #0d6efd; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+        .toggle-sort-btn.active-mode { background: #0d6efd; color: #fff; }
+        .toggle-sort-btn.item-mode-color { color: #ff9800; border-color: #ff9800; }
+        .toggle-sort-btn.item-mode-color.active-mode { background: #ff9800; color: #fff; }
 
         /* 메모장 전용 스타일 */
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
@@ -173,14 +179,16 @@
         
         <div class="top-action-bar">
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
+            <!-- [개선] 인쇄 버튼 옆으로 완벽 이동 배치된 정렬 마스터 스위치 컨트롤러 -->
+            <button id="masterFolderSortBtn" class="toggle-sort-btn" onclick="toggleMasterFolderSort()">↕️ 파일(폴더) 정렬 모드</button>
+            <button id="masterItemSortBtn" class="toggle-sort-btn item-mode-color" onclick="toggleMasterItemSort()">↕️ 내부 물품 정렬 모드</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
 
         <p style="font-size:12px; color:#6c757d; margin-top:-5px;">
-            * 더보기(⋮) 메뉴에서 <b>[정렬 모드 켜기]</b>를 누르면 꾹 누르고 있을 필요 없이 해당 카드를 자유롭게 끌어서 이동할 수 있습니다.
+            * 상단 정렬 모드 버튼을 누르면 해당 카드 전체를 마우스로 자유롭게 배치 이동시킬 수 있습니다.
         </p>
         
-        <!-- 분류 파일 리스트 컨테이너 -->
         <div id="itemStatusList">데이터를 불러오는 중...</div>
     </div>
 
@@ -198,12 +206,17 @@
         let globalCategories = [];
         let stickyNotes = [];
         
-        // Sortable 인스턴스 참조 보관용 객체
-        let folderSortableInstance = null;
-        let itemSortableInstances = {};
+        // 정렬 인스턴스 보관 플래그
+        let globalFolderSortable = null;
+        let globalItemSortables = [];
+        let isFolderSortModeActive = false;
+        let isItemSortModeActive = false;
 
         function openTab(tabId) {
             try {
+                // 탭 변경 시 정렬 모드 초기화
+                resetSortModes();
+                
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active-btn'));
                 
@@ -218,6 +231,19 @@
                 if(tabId === 'inflow' || tabId === 'outflow') loadItems();
                 if(tabId === 'notepad') renderNotes();
             } catch (err) { console.error(err); }
+        }
+
+        function resetSortModes() {
+            if(globalFolderSortable) { globalFolderSortable.destroy(); globalFolderSortable = null; }
+            globalItemSortables.forEach(s => { if(s) s.destroy(); });
+            globalItemSortables = [];
+            isFolderSortModeActive = false;
+            isItemSortModeActive = false;
+            
+            const fBtn = document.getElementById('masterFolderSortBtn');
+            const iBtn = document.getElementById('masterItemSortBtn');
+            if(fBtn) fBtn.classList.remove('active-mode');
+            if(iBtn) iBtn.classList.remove('active-mode');
         }
 
         window.onload = function() {
@@ -239,14 +265,12 @@
                 loadCategories();
             } catch(e) { console.error(e); }
             
-            // 더보기 메뉴 외 영역 클릭 시 드롭다운 닫기
             window.addEventListener('click', function(e) {
                 if(!e.target.classList.contains('more-btn')) {
                     document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
                 }
             });
 
-            // 스크롤이나 리사이즈 시 떠 있는 드롭다운 위치 동적 변경 보정
             window.addEventListener('scroll', updateOpenDropdownPosition, true);
             window.addEventListener('resize', updateOpenDropdownPosition);
         };
@@ -297,7 +321,7 @@
             });
         }
 
-        /* --- 자재 데이터 제어 로직 --- */
+        /* --- 코어 데이터 처리 로직 --- */
         function checkNewCategory(select) {
             const input = document.getElementById('newCategoryInput');
             if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
@@ -417,7 +441,7 @@
             loadInventoryStatus();
         }
 
-        /* [개선] 밖으로 튀어나오도록 드롭다운 고정(Fixed) 좌표 연산 처리 */
+        /* 드롭다운 좌표 바인딩 고정 연산 */
         function toggleMoreMenu(event) {
             event.stopPropagation();
             const btn = event.target;
@@ -437,7 +461,6 @@
 
         function positionDropdown(btn, dropdown) {
             const rect = btn.getBoundingClientRect();
-            // 버튼의 우측 아래 끝단에 맞추어 화면 고정 좌표(fixed position) 설정
             dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
             dropdown.style.left = (rect.right - dropdown.offsetWidth + window.scrollX) + 'px';
             dropdown.style.position = 'fixed';
@@ -453,28 +476,27 @@
             }
         }
 
-        /* [개선] 대분류 폴더 이동 정렬 토글 모드 */
-        function toggleFolderSortMode(catName, btn, event) {
-            event.stopPropagation();
+        /* --- [개선] 인쇄버튼 옆 상단 마스터 대분류 폴더 전체 이동 토글 로직 --- */
+        function toggleMasterFolderSort() {
+            const btn = document.getElementById('masterFolderSortBtn');
             const container = document.getElementById('itemStatusList');
-            const targetSection = document.querySelector(`.category-section[data-catname="${catName}"]`);
-            
-            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
 
-            if (folderSortableInstance && folderSortableInstance.options.disabled === false) {
-                // 이미 켜져있는 경우 종료 처리
-                folderSortableInstance.destroy();
-                folderSortableInstance = null;
-                document.querySelectorAll('.category-section').forEach(s => s.classList.remove('sort-mode-folder-active'));
-                alert('📁 분류 폴더 정렬이 고정 및 저장되었습니다.');
+            if (isFolderSortModeActive) {
+                resetSortModes();
+                alert('🔒 모든 분류 파일(폴더) 정렬 배치가 저장 완료되었습니다.');
                 loadInventoryStatus();
                 return;
             }
 
-            // 정렬 모드 시작 활성화
+            // 상반된 다른 정렬모드 끄기
+            resetSortModes();
+
+            isFolderSortModeActive = true;
+            btn.classList.add('active-mode');
+
             document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
-            
-            folderSortableInstance = Sortable.create(container, {
+
+            globalFolderSortable = Sortable.create(container, {
                 animation: 200,
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
@@ -489,46 +511,74 @@
                 }
             });
 
-            alert(`[${catName}] 폴더 정렬 기능이 켜졌습니다.\n이제 파란색 칸 아무 곳이나 붙잡고 원하는 곳으로 위아래로 끌어서 움직이세요.\n완료되면 다시 더보기에서 [정렬 완료]를 누르세요.`);
+            alert('📁 [파일(폴더) 정렬 모드]가 활성화되었습니다!\n이제 파란색 점선 칸 아무 곳이나 마우스로 잡고 끌어당겨 정렬하세요.\n완료되면 상단의 버튼을 다시 눌러 고정시키세요.');
         }
 
-        /* [개선] 폴더 내부 물품 카드 이동 정렬 토글 모드 */
-        function toggleItemSortMode(catName, itemId, btn, event) {
-            event.stopPropagation();
-            const targetSection = document.querySelector(`.category-section[data-catname="${catName}"]`);
-            const dragContainer = targetSection.querySelector('.items-drag-container');
-            
-            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
+        /* --- [개선] 인쇄버튼 옆 상단 마스터 내부 물품 전체 자료 이동 토글 로직 --- */
+        function toggleMasterItemSort() {
+            const btn = document.getElementById('masterItemSortBtn');
 
-            if (itemSortableInstances[catName]) {
-                // 이미 켜져있는 경우 종료 처리
-                itemSortableInstances[catName].destroy();
-                delete itemSortableInstances[catName];
-                dragContainer.querySelectorAll('.item-card').forEach(c => c.classList.remove('sort-mode-item-active'));
-                alert('📦 물품 정렬이 고정 및 완료되었습니다.');
+            if (isItemSortModeActive) {
+                resetSortModes();
+                alert('🔒 모든 내부 물품의 배치가 안전하게 업데이트 및 정렬 저장되었습니다.');
                 loadInventoryStatus();
                 return;
             }
 
-            // 물품 정렬 모드 시작 활성화
-            dragContainer.querySelectorAll('.item-card').forEach(c => c.classList.add('sort-mode-item-active'));
+            resetSortModes();
 
-            itemSortableInstances[catName] = Sortable.create(dragContainer, {
-                animation: 200,
-                ghostClass: 'sortable-ghost',
-                chosenClass: 'sortable-chosen',
-                async onEnd() {
-                    const cards = dragContainer.querySelectorAll('.item-card');
-                    for(let i = 0; i < cards.length; i++) {
-                        const id = cards[i].getAttribute('data-itemid');
-                        await fetch(`${BASE_URL}/items?id=eq.${id}`, {
-                            method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
-                        });
+            isItemSortModeActive = true;
+            btn.classList.add('active-mode');
+
+            document.querySelectorAll('.item-card').forEach(c => c.classList.add('sort-mode-item-active'));
+
+            const containers = document.querySelectorAll('.items-drag-container');
+            containers.forEach(dragContainer => {
+                const sortableInstance = Sortable.create(dragContainer, {
+                    animation: 200,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    async onEnd() {
+                        const cards = dragContainer.querySelectorAll('.item-card');
+                        for(let i = 0; i < cards.length; i++) {
+                            const id = cards[i].getAttribute('data-itemid');
+                            await fetch(`${BASE_URL}/items?id=eq.${id}`, {
+                                method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
+                            });
+                        }
                     }
-                }
+                });
+                globalItemSortables.push(sortableInstance);
             });
 
-            alert(`해당 폴더 내부의 물품 정렬이 활성화되었습니다.\n노란색 박스 아무 곳이나 편하게 마우스로 잡고 끌어서 위아래 배치 정렬하세요.\n배치가 끝나면 다시 더보기에서 [정렬 완료]를 클릭하세요.`);
+            alert('📦 [내부 물품 자료 정렬 모드]가 활성화되었습니다!\n이제 노란색 점선 칸 아무 곳이나 마우스로 자유롭게 잡고 드래그하세요.\n완료되면 상단의 버튼을 다시 눌러 모드를 끄세요.');
+        }
+
+        /* --- [개선] 요구사항: 물품 자체 이름 수정 함수 추가 --- */
+        async function renameItemFromServer(itemId, oldItemName, event) {
+            event.stopPropagation();
+            const newItemName = prompt(`[${oldItemName}] 물품의 새로운 이름을 입력하세요:`, oldItemName);
+            if(!newItemName || newItemName.trim() === '' || newItemName.trim() === oldItemName) return;
+            
+            const targetName = newItemName.trim();
+            try {
+                // 1. 물품 기본 정보 테이블 업데이트
+                const itemPatch = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ name: targetName })
+                });
+
+                if(!itemPatch.ok) throw new Error('서버 물품명 변경 실패');
+
+                // 2. 기존 입출고 기록들의 연동 물품명 명칭 일괄 동기화 업데이트
+                await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName })
+                });
+
+                alert(`물품명이 [ ${targetName} ] (으)로 변경 및 동기화되었습니다.`);
+                loadInventoryStatus();
+            } catch(e) { 
+                alert("수정 오류: " + e.message); 
+            }
         }
 
         async function renameCategoryFromStatus(oldCatName, event) {
@@ -591,21 +641,15 @@
                     const section = document.createElement('div');
                     section.className = 'category-section';
                     section.setAttribute('data-catname', catName);
+                    if(isFolderSortModeActive) section.classList.add('sort-mode-folder-active');
                     
-                    // 폴더 상태 판별
-                    const isFolderSortActive = folderSortableInstance !== null;
-                    const folderBtnText = isFolderSortActive ? "🔒 정렬 완료 (고정)" : "↕️ 폴더 위치 이동 켜기";
-                    const folderBtnClass = isFolderSortActive ? "mode-active-btn" : "";
-
                     section.innerHTML = `
                         <div class="category-title">
                             <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span></div>
                             <div class="more-menu-container">
                                 <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                 <div class="more-dropdown">
-                                    <!-- [개선] 꾹 누르지 않고 온오프 클릭 방식으로 변환 -->
-                                    <button class="${folderBtnClass}" onclick="toggleFolderSortMode('${catName}', this, event)">${folderBtnText}</button>
-                                    <button onclick="renameCategoryFromStatus('${catName}', event)">✏️ 이름 수정</button>
+                                    <button onclick="renameCategoryFromStatus('${catName}', event)">✏️ 폴더 이름 수정</button>
                                     <button class="del-action" onclick="deleteCategoryFromStatus('${catName}', event)">🗑️ 분류 전체삭제</button>
                                 </div>
                             </div>
@@ -629,10 +673,7 @@
                             const card = document.createElement('div');
                             card.className = 'item-card';
                             card.setAttribute('data-itemid', item.id);
-                            
-                            const isItemSortActive = itemSortableInstances[catName] !== undefined;
-                            const itemBtnText = isItemSortActive ? "🔒 정렬 완료 (고정)" : "↕️ 물품 순서 조정 켜기";
-                            const itemBtnClass = isItemSortActive ? "mode-active-btn" : "";
+                            if(isItemSortModeActive) card.classList.add('sort-mode-item-active');
 
                             let historyHtml = '';
                             if(itemLogs.length === 0) {
@@ -665,8 +706,8 @@
                                     <div class="more-menu-container">
                                         <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                         <div class="more-dropdown">
-                                            <!-- [개선] 내부 아이템 역시 클릭식 토글 모드로 제어 -->
-                                            <button class="${itemBtnClass}" onclick="toggleItemSortMode('${catName}', '${item.id}', this, event)">${itemBtnText}</button>
+                                            <!-- [개선/추가] 개별 조작 패널 정리 및 이름 수정 버튼 구현 배치 -->
+                                            <button onclick="renameItemFromServer('${item.id}', '${item.name}', event)">✏️ 물품 이름 수정</button>
                                             <button onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 다른 분류로 이동</button>
                                             <button class="del-action" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">🗑️ 물품 삭제</button>
                                         </div>
@@ -680,10 +721,42 @@
                     container.appendChild(section);
                 });
 
+                // 만약 활성화 상태에서 렌더링이 호출되면 바인딩 상태 복구 연산
+                if(isFolderSortModeActive) {
+                    globalFolderSortable = Sortable.create(container, {
+                        animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+                        onEnd() {
+                            const sections = container.querySelectorAll('.category-section');
+                            const newFolderOrder = [];
+                            sections.forEach(sec => { newFolderOrder.push(sec.getAttribute('data-catname')); });
+                            globalCategories = newFolderOrder;
+                            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
+                        }
+                    });
+                }
+                if(isItemSortModeActive) {
+                    const containers = document.querySelectorAll('.items-drag-container');
+                    containers.forEach(dragContainer => {
+                        const sortableInstance = Sortable.create(dragContainer, {
+                            animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+                            async onEnd() {
+                                const cards = dragContainer.querySelectorAll('.item-card');
+                                for(let i = 0; i < cards.length; i++) {
+                                    const id = cards[i].getAttribute('data-itemid');
+                                    await fetch(`${BASE_URL}/items?id=eq.${id}`, {
+                                        method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
+                                    });
+                                }
+                            }
+                        });
+                        globalItemSortables.push(sortableInstance);
+                    });
+                }
+
             } catch (error) { console.error(error); }
         }
 
-        /* --- 유틸리티 편집 액션 함수들 --- */
+        /* --- 유틸리티 액션 함수들 --- */
         function toggleHistory(headerElement) {
             if(headerElement && headerElement.nextElementSibling && !event.target.classList.contains('more-btn')) {
                 headerElement.nextElementSibling.classList.toggle('show');
