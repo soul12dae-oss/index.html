@@ -18,23 +18,19 @@
         button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button.btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; cursor: pointer; font-weight: bold; }
         
-        /* 분류별 그룹 스타일 */
         .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; }
         .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 물품 카드 & 순서조정 스타일 */
         .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; }
         .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
         .item-info { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; }
         .stock-badge { background: #e2e3e5; padding: 3px 6px; border-radius: 4px; font-size: 12px; color: #495057; }
         
-        /* 제어 버튼 세트 */
         .action-container { display: flex; align-items: center; gap: 5px; }
         .order-btn-set button { background: #f1f3f5; border: 1px solid #ced4da; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
         .move-folder-btn { background: #fff; border: 1px solid #0d6efd; color: #0d6efd; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
         .move-folder-btn:active { background: #0d6efd; color: #fff; }
 
-        /* 상세 입출고 내역 및 개별 수정 */
         .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
         .history-content.show { display: block; }
         .log-row { padding: 10px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: center; }
@@ -56,7 +52,6 @@
         <button id="btn-status" onclick="openTab('status')">전체현황</button>
     </div>
 
-    <!-- 1. 메인 화면 -->
     <div id="main" class="tab-content active">
         <h2>물품 등록</h2>
         <div class="form-group">
@@ -78,7 +73,6 @@
         <button class="btn" onclick="addItem()">물품 등록하기</button>
     </div>
 
-    <!-- 2. 입고 화면 -->
     <div id="inflow" class="tab-content">
         <h2>자재 입고</h2>
         <div class="form-group">
@@ -96,7 +90,6 @@
         <button class="btn" onclick="logStock('입고')">입고 완료</button>
     </div>
 
-    <!-- 3. 출고 화면 -->
     <div id="outflow" class="tab-content">
         <h2>자재 출고</h2>
         <div class="form-group">
@@ -114,7 +107,6 @@
         <button class="btn btn-danger" style="width:100%; padding:14px; font-size:16px;" onclick="logStock('출고')">출고 완료</button>
     </div>
 
-    <!-- 4. 전체 현황 화면 -->
     <div id="status" class="tab-content">
         <h2>전체 현황판</h2>
         
@@ -123,8 +115,8 @@
         </div>
 
         <p style="font-size:12px; color:#6c757d; margin-top:-5px;">
-            * 물품 카드를 누르면 상세 내역 수정이 가능합니다.<br>
-            * ▲ ▼ 버튼으로 순서를 바꾸고, <b>[이동]</b> 버튼으로 다른 분류에 넣고 뺄 수 있습니다.
+            * 물품 카드를 누르면 상세 내역 수정 및 내역 삭제가 가능합니다.<br>
+            * ▲ ▼ 버튼으로 순서를 바꾸고, 필요 없는 물품은 <b>[삭제]</b> 버튼으로 제거할 수 있습니다.
         </p>
         <div id="itemStatusList"></div>
     </div>
@@ -169,13 +161,17 @@
             }
         }
 
+        function normalizeCategory(cat) {
+            if(!cat || cat.trim() === '' || cat.trim() === 'null') return '기본분류';
+            return cat.trim();
+        }
+
         async function loadCategories() {
             try {
                 const response = await fetch(`${BASE_URL}/items?select=category`, { headers });
                 const data = await response.json();
                 
-                // [해결] 공백 제거 및 완벽한 중복 제거 필터링
-                const dbCats = data.map(item => item.category ? item.category.trim() : '기본분류');
+                const dbCats = data.map(item => normalizeCategory(item.category));
                 const uniqueCats = [...new Set(['기본분류', ...dbCats])];
                 globalCategories = uniqueCats;
                 
@@ -187,295 +183,3 @@
                     select.innerHTML = options;
                     document.getElementById('newCategoryInput').style.display = 'none';
                 }
-            } catch (e) { console.error(e); }
-        }
-
-        async function loadItems() {
-            try {
-                const response = await fetch(`${BASE_URL}/items?select=name&order=sort_order.asc`, { headers });
-                const data = await response.json();
-                let options = '<option value="">물품을 선택하세요</option>';
-                data.forEach(item => { options += `<option value="${item.name}">${item.name}</option>`; });
-                document.getElementById('inItemSelect').innerHTML = options;
-                document.getElementById('outItemSelect').innerHTML = options;
-            } catch (error) { console.error(error); }
-        }
-
-        async function addItem() {
-            const select = document.getElementById('itemCategorySelect');
-            const newInput = document.getElementById('newCategoryInput');
-            let category = select.value;
-            
-            if(category === '__NEW__') {
-                category = newInput.value.trim();
-                if(!category) return alert('새로운 분류 명칭을 입력해 주세요.');
-            }
-
-            const name = document.getElementById('itemName').value.trim();
-            const memo = document.getElementById('itemMemo').value.trim();
-            if(!name) return alert('물품명을 입력해주세요.');
-
-            try {
-                const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
-                const countData = await countRes.json();
-                const nextOrder = countData.length + 1;
-
-                const response = await fetch(`${BASE_URL}/items`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
-                });
-
-                if (!response.ok) throw new Error('등록 오류');
-
-                alert(`[${category} > ${name}] 등록 완료!`);
-                document.getElementById('itemName').value = '';
-                document.getElementById('itemMemo').value = '';
-                newInput.value = '';
-                loadCategories();
-            } catch (error) { alert(error.message); }
-        }
-
-        async function logStock(type) {
-            const prefix = type === '입고' ? 'in' : 'out';
-            const itemName = document.getElementById(`${prefix}ItemSelect`).value;
-            const count = parseInt(document.getElementById(`${prefix}Count`).value);
-            const note = document.getElementById(`${prefix}Note`).value.trim();
-            
-            if(!itemName) return alert('물품을 선택하세요.');
-            if(!count || count <= 0) return alert('정확한 수량을 입력하세요.');
-
-            try {
-                const response = await fetch(`${BASE_URL}/stock_logs`, {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ type, item_name: itemName, count, note })
-                });
-                if (!response.ok) throw new Error('기록 실패');
-                alert(`${itemName} ${count}개 ${type} 완료!`);
-                document.getElementById(`${prefix}Count`).value = '';
-                document.getElementById(`${prefix}Note`).value = '';
-            } catch (error) { alert(error.message); }
-        }
-
-        function createNewCategoryFromStatus() {
-            const newCatName = prompt('새로 만들 분류 파일(폴더) 이름을 지정하세요:');
-            if(!newCatName || newCatName.trim() === '') return;
-            
-            const target = newCatName.trim();
-            if(globalCategories.includes(target)) {
-                return alert('이미 존재하는 분류 파일입니다.');
-            }
-            
-            globalCategories.push(target);
-            alert(`[${target}] 분류가 추가되었습니다. 물품의 [이동/빼기] 버튼으로 분류를 지정해 주세요.`);
-            loadInventoryStatus();
-        }
-
-        // 전체 현황판 렌더링
-        async function loadInventoryStatus() {
-            const container = document.getElementById('itemStatusList');
-            container.innerHTML = '현황판을 빌드 중입니다...';
-
-            try {
-                const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
-                const itemsData = await itemRes.json();
-
-                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
-                const logsData = await logRes.json();
-
-                container.innerHTML = '';
-
-                // [해결] 중복 결합 방지 로직 보완
-                const activeDbCategories = itemsData.map(item => item.category ? item.category.trim() : '기본분류');
-                const allCategories = [...new Set([...globalCategories, ...activeDbCategories])].filter(Boolean);
-
-                const groups = {};
-                allCategories.forEach(c => groups[c] = []);
-                itemsData.forEach(item => {
-                    const cat = item.category ? item.category.trim() : '기본분류';
-                    if(!groups[cat]) groups[cat] = [];
-                    groups[cat].push(item);
-                });
-
-                for (const catName of allCategories) {
-                    const matchedItems = groups[catName] || [];
-                    
-                    if(matchedItems.length === 0 && catName === '기본분류') continue;
-
-                    const section = document.createElement('div');
-                    section.className = 'category-section';
-                    section.innerHTML = `<div class="category-title">📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(물품 ${matchedItems.length}개)</span></div>`;
-
-                    if(matchedItems.length === 0) {
-                        section.innerHTML += `<div style="color:#bbb; font-size:13px; text-align:center; padding:10px;">이 분류 파일은 비어있습니다.</div>`;
-                        container.appendChild(section);
-                        continue;
-                    }
-
-                    matchedItems.forEach((item, idx) => {
-                        const itemLogs = logsData.filter(log => log.item_name === item.name);
-                        
-                        let totalStock = 0;
-                        itemLogs.forEach(l => {
-                            if(l.type === '입고') totalStock += l.count;
-                            if(l.type === '출고') totalStock -= l.count;
-                        });
-
-                        const card = document.createElement('div');
-                        card.className = 'item-card';
-
-                        let historyHtml = '';
-                        if(itemLogs.length === 0) {
-                            historyHtml = '<div style="color:#999; text-align:center; padding:10px;">기록이 없습니다.</div>';
-                        } else {
-                            itemLogs.forEach(log => {
-                                const dt = new Date(log.created_at);
-                                const timeStr = `${dt.toLocaleDateString('ko-KR')} ${dt.toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'})}`;
-
-                                historyHtml += `
-                                    <div class="log-row">
-                                        <div>
-                                            <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                            <strong>${log.count}개</strong> <span style="font-size:12px; color:#777;">(${timeStr})</span>
-                                            ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
-                                        </div>
-                                        <div class="log-actions">
-                                            <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}')">수정</button>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                        }
-
-                        const prevId = idx > 0 ? matchedItems[idx-1].id : null;
-                        const prevOrder = idx > 0 ? matchedItems[idx-1].sort_order : null;
-                        const nextId = idx < matchedItems.length - 1 ? matchedItems[idx+1].id : null;
-                        const nextOrder = idx < matchedItems.length - 1 ? matchedItems[idx+1].sort_order : null;
-
-                        card.innerHTML = `
-                            <div class="item-header" onclick="toggleHistory(this)">
-                                <div class="item-info">
-                                    <span class="item-title">${item.name}</span>
-                                    <span class="stock-badge">재고: ${totalStock}개</span>
-                                </div>
-                                <div class="action-container">
-                                    <button class="move-folder-btn" onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 이동/빼기</button>
-                                    <div class="order-btn-set">
-                                        <button onclick="moveOrder('${item.id}', ${item.sort_order}, '${prevId}', ${prevOrder}, event)">▲</button>
-                                        <button onclick="moveOrder('${item.id}', ${item.sort_order}, '${nextId}', ${nextOrder}, event)">▼</button>
-                                    </div>
-                                    <!-- [기능 추가] 물품 완전히 삭제하는 버튼 부착 -->
-                                    <button class="btn-danger" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">삭제</button>
-                                </div>
-                            </div>
-                            <div class="history-content">
-                                <div style="font-size:11px; font-weight:bold; color:#777; margin-bottom:5px;">상세 내역 편집</div>
-                                ${historyHtml}
-                            </div>
-                        `;
-                        section.appendChild(card);
-                    });
-                    container.appendChild(section);
-                }
-            } catch (error) { container.innerHTML = '로드 실패: ' + error.message; }
-        }
-
-        function toggleHistory(headerElement) {
-            headerElement.nextElementSibling.classList.toggle('show');
-        }
-
-        /* [기능 추가] 서버에서 물품을 완전히 삭제하는 함수 */
-        async function deleteItemFromServer(itemId, itemName, event) {
-            event.stopPropagation(); // 카드 열림 방지
-
-            // 브라우저 경고 문구 작동
-            const isConfirmed = confirm(`⚠️ 정말로 [ ${itemName} ] 물품을 완전히 삭제하시겠습니까?\n삭제하시면 되돌릴 수 없습니다.`);
-            
-            if (!isConfirmed) return; // '취소' 누르면 패스
-
-            try {
-                const res = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
-                    method: 'DELETE',
-                    headers
-                });
-
-                if (!res.ok) throw new Error('삭제 실패');
-                
-                alert(`[ ${itemName} ] 물품이 정상적으로 삭제되었습니다.`);
-                loadInventoryStatus(); // 새로고침 없이 리스트 즉시 리로드
-            } catch (e) {
-                alert('오류 발생: ' + e.message);
-            }
-        }
-
-        async function moveItemCategory(itemId, itemName, currentCat, event) {
-            event.stopPropagation();
-
-            let catListTxt = globalCategories.map((c, i) => `${i + 1}. ${c}`).join('\n');
-            const choice = prompt(`[${itemName}] 물품을 이동할 분류 파일 번호를 입력하세요:\n\n${catListTxt}\n\n(※ 기본분류로 빼고 싶다면 '기본분류' 번호를 선택하세요)`);
-            
-            if(!choice) return;
-            const idx = parseInt(choice) - 1;
-
-            if(isNaN(idx) || idx < 0 || idx >= globalCategories.length) {
-                return alert('올바른 번호가 아닙니다.');
-            }
-
-            const targetCategory = globalCategories[idx];
-            if(targetCategory === currentCat) return alert('이미 해당 분류에 포함되어 있습니다.');
-
-            try {
-                const res = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify({ category: targetCategory })
-                });
-
-                if(!res.ok) throw new Error('이동 처리 실패');
-                alert(`[${itemName}] 물품이 [${targetCategory}] 파일로 이동되었습니다.`);
-                loadInventoryStatus();
-            } catch(e) {
-                alert(e.message);
-            }
-        }
-
-        async function editLogDetail(logId, currentType, currentCount, currentNote) {
-            const newType = prompt("구분을 입력하세요 (입고 또는 출고):", currentType);
-            if(!newType || (newType !== '입고' && newType !== '출고')) return alert('입고 또는 출고만 입력 가능합니다.');
-
-            const newCountStr = prompt("변경할 수량을 입력하세요:", currentCount);
-            const newCount = parseInt(newCountStr);
-            if(isNaN(newCount) || newCount <= 0) return alert('올바른 수량을 입력해주세요.');
-
-            const newNote = prompt("특이사항/메모를 입력하세요:", currentNote);
-
-            try {
-                const res = await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify({ type: newType, count: newCount, note: newNote })
-                });
-                if(!res.ok) throw new Error('수정 실패');
-                alert('해당 입출고 기록이 정정되었습니다.');
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-
-        async function moveOrder(currentId, currentOrder, targetId, targetOrder, event) {
-            event.stopPropagation();
-            if(!targetId || targetId === 'null') return;
-
-            try {
-                await fetch(`${BASE_URL}/items?id=eq.${currentId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: targetOrder })
-                });
-                await fetch(`${BASE_URL}/items?id=eq.${targetId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: currentOrder })
-                });
-                loadInventoryStatus();
-            } catch (e) { alert('순서 변경 실패: ' + e.message); }
-        }
-    </script>
-</body>
-</html>
