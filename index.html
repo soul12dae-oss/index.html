@@ -34,11 +34,12 @@
         .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
         .item-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
         
-        /* 요구사항 1: 재고 갯수 강조 배지 변경 */
         .stock-badge { background: #e2e3e5; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #111; border: 1px solid #ced4da; font-weight: 800; }
         
         .action-container { display: flex; align-items: center; gap: 5px; }
         .order-btn-set button { background: #f1f3f5; border: 1px solid #ced4da; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        
+        /* [이동] 버튼 간소화 디자인 */
         .move-folder-btn { background: #fff; border: 1px solid #0d6efd; color: #0d6efd; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: bold; }
         
         .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
@@ -51,11 +52,8 @@
         
         .top-action-bar { display: flex; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
         .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        
-        /* 요구사항 3: 인쇄 버튼 스타일 */
         .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 
-        /* 인쇄 전용 CSS 미디어 쿼리 */
         @media print {
             body { background: white; color: black; padding: 0; }
             .nav, .top-action-bar, p, .action-container, .log-actions, .more-menu-container { display: none !important; }
@@ -82,8 +80,7 @@
         <div class="form-group">
             <label>분류 (파일/폴더 선택 및 생성)</label>
             <select id="itemCategorySelect" onchange="checkNewCategory(this)">
-                <option value="기본분류">기본분류</option>
-                <option value="__NEW__">+ 새 분류 파일 만들기...</option>
+                <!-- 자바스크립트에서 동적으로 생성됩니다. -->
             </select>
             <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류(파일) 이름을 입력하세요">
         </div>
@@ -139,7 +136,6 @@
         <h2>전체 현황판</h2>
         
         <div class="top-action-bar">
-            <!-- 요구사항 3: 인쇄 버튼 상단 배치 -->
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
@@ -162,7 +158,8 @@
             "Prefer": "return=representation"
         };
 
-        let globalCategories = ['기본분류'];
+        // 기본분류 배열 요소를 완전히 비워서 시작합니다.
+        let globalCategories = [];
 
         function openTab(tabId) {
             try {
@@ -189,9 +186,11 @@
                 loadCategories();
             } catch(e) { console.error("초기 로딩 무시:", e); }
             
-            // 더보기 메뉴 열려있을 때 바깥쪽 클릭 시 닫히도록 전역 이벤트 추가
-            window.addEventListener('click', function() {
-                document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
+            // 더보기 메뉴 바깥 영역 클릭 시 닫기 기능
+            window.addEventListener('click', function(e) {
+                if(!e.target.classList.contains('more-btn')) {
+                    document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
+                }
             });
         };
 
@@ -205,8 +204,9 @@
             }
         }
 
+        // 공백 혹은 null 유무 체크만 하고 '기본분류'로 자동 변환하던 강제 로직 해제
         function normalizeCategory(cat) {
-            if(!cat || String(cat).trim() === '' || String(cat).trim() === 'null') return '기본분류';
+            if(!cat || String(cat).trim() === '' || String(cat).trim() === 'null') return '미지정분류';
             return String(cat).trim();
         }
 
@@ -217,13 +217,18 @@
                 const data = await response.json();
                 
                 const dbCats = Array.isArray(data) ? data.map(item => normalizeCategory(item.category)) : [];
-                const uniqueCats = [...new Set(['기본분류', ...dbCats])];
+                // 고유값 필터 시 강제 '기본분류' 삽입 로직 제거
+                const uniqueCats = [...new Set(dbCats)].filter(c => c !== '기본분류');
                 globalCategories = uniqueCats;
                 
                 const select = document.getElementById('itemCategorySelect');
                 if(select) {
                     let options = '';
-                    globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
+                    if(globalCategories.length === 0) {
+                        options += `<option value="">선택 가능한 분류 없음 (새 분류를 생성하세요)</option>`;
+                    } else {
+                        globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
+                    }
                     options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
                     select.innerHTML = options;
                     document.getElementById('newCategoryInput').style.display = 'none';
@@ -257,6 +262,7 @@
                 category = newInput.value.trim();
                 if(!category) return alert('새로운 분류 명칭을 입력해 주세요.');
             }
+            if(!category) return alert('분류를 선택하거나 새로 생성해주세요.');
             category = normalizeCategory(category);
 
             const name = document.getElementById('itemName').value.trim();
@@ -320,19 +326,21 @@
             loadInventoryStatus();
         }
 
-        // 요구사항 2: 더보기 토글 스크립트
-        function toggleMoreMenu(event, catName) {
+        // 개선: 더보기 버튼을 한 번 더 누르면 창이 닫히도록 토글 로직 최적화
+        function toggleMoreMenu(event) {
             event.stopPropagation();
-            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
             const dropdown = event.target.nextElementSibling;
-            if(dropdown) dropdown.classList.toggle('show');
+            const isOpen = dropdown.classList.contains('show');
+            
+            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
+            
+            if(!isOpen && dropdown) {
+                dropdown.classList.add('show');
+            }
         }
 
-        // 요구사항 2: 분류명 관리자 일괄 변경 (Supabase 동기화)
         async function renameCategoryFromStatus(oldCatName, event) {
             event.stopPropagation();
-            if(oldCatName === '기본분류') return alert('기본분류는 이름을 바꿀 수 없습니다.');
-            
             const newCatName = prompt(`[${oldCatName}] 분류의 새 이름을 입력하세요:`, oldCatName);
             if(!newCatName || newCatName.trim() === '' || newCatName === oldCatName) return;
             
@@ -350,18 +358,14 @@
                 
                 if(!res.ok) throw new Error('분류명 변경 실패');
                 
-                // 전역 리스트 업데이트
                 globalCategories = globalCategories.map(c => c === oldCatName ? normalizedNew : c);
                 alert('분류 이름이 성공적으로 수정되었습니다.');
                 loadInventoryStatus();
             } catch(e) { alert(e.message); }
         }
 
-        // 요구사항 2: 분류 삭제 및 하위 자재 통째로 일괄 삭제
         async function deleteCategoryFromStatus(catName, event) {
             event.stopPropagation();
-            if(catName === '기본분류') return alert('기본분류는 삭제할 수 없습니다.');
-
             if(!confirm(`⚠️ 정말로 [${catName}] 분류와 그 안에 포함된 모든 물품들을 서버에서 일괄 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
 
             try {
@@ -402,7 +406,8 @@
                 itemsData.forEach(item => { item.category = normalizeCategory(item.category); });
 
                 const activeDbCategories = itemsData.map(item => item.category);
-                const allCategories = [...new Set([...globalCategories.map(normalizeCategory), ...activeDbCategories])].filter(Boolean);
+                // 기본분류 원천 제거 필터링 적용
+                const allCategories = [...new Set([...globalCategories.map(normalizeCategory), ...activeDbCategories])].filter(c => c && c !== '기본분류');
 
                 const groups = {};
                 allCategories.forEach(c => groups[c] = []);
@@ -410,17 +415,15 @@
 
                 for (const catName of allCategories) {
                     const matchedItems = groups[catName] || [];
-                    if(matchedItems.length === 0 && catName === '기본분류') continue;
 
                     const section = document.createElement('div');
                     section.className = 'category-section';
                     
-                    // 요구사항 2: 분류 타이틀 부분에 더보기 메뉴(⋮) 마크업 탑재
                     section.innerHTML = `
                         <div class="category-title">
                             <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(물품 ${matchedItems.length}개)</span></div>
                             <div class="more-menu-container">
-                                <button class="more-btn" onclick="toggleMoreMenu(event, '${catName}')">⋮</button>
+                                <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                 <div class="more-dropdown">
                                     <button onclick="renameCategoryFromStatus('${catName}', event)">✏️ 이름 수정</button>
                                     <button class="del-action" onclick="deleteCategoryFromStatus('${catName}', event)">🗑️ 분류 전체삭제</button>
@@ -476,6 +479,7 @@
                         const nextId = idx < matchedItems.length - 1 ? matchedItems[idx+1].id : null;
                         const nextOrder = idx < matchedItems.length - 1 ? matchedItems[idx+1].sort_order : null;
 
+                        // 개선: 텍스트를 [📁 이동]으로 심플하게 변경
                         card.innerHTML = `
                             <div class="item-header" onclick="toggleHistory(this)">
                                 <div class="item-info">
@@ -483,7 +487,7 @@
                                     <span class="stock-badge">재고: ${totalStock}개</span>
                                 </div>
                                 <div class="action-container">
-                                    <button class="move-folder-btn" onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 이동/빼기</button>
+                                    <button class="move-folder-btn" onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 이동</button>
                                     <div class="order-btn-set">
                                         <button onclick="moveOrder('${item.id}', ${item.sort_order || 0}, '${prevId}', ${prevOrder || 0}, event)">▲</button>
                                         <button onclick="moveOrder('${item.id}', ${item.sort_order || 0}, '${nextId}', ${nextOrder || 0}, event)">▼</button>
