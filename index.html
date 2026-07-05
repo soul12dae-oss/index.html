@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>자재 입출고 관리 시스템</title>
+    <title>자재 입출고 관리 시스템 Pro</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
         .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; }
@@ -14,26 +14,33 @@
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; }
-        .form-group textarea { height: 80px; resize: none; }
+        .form-group textarea { height: 60px; resize: none; }
         button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button.btn-danger { background: #dc3545; }
         
-        /* 폰/모바일 최적화 접이식 현황판 스타일 */
-        .status-container { max-width: 600px; }
-        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; }
-        .item-header { padding: 16px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; font-weight: bold; font-size: 16px; }
-        .item-info { display: flex; align-items: center; gap: 10px; }
-        .stock-badge { background: #e2e3e5; padding: 4px 8px; border-radius: 4px; font-size: 13px; color: #495057; }
-        .edit-btn { background: #6c757d; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+        /* 분류별 그룹 스타일 */
+        .category-section { margin-bottom: 25px; }
+        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 클릭 시 열리는 상세 내역 */
+        /* 물품 카드 & 순서조정 스타일 */
+        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; }
+        .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
+        .item-info { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 15px; }
+        .stock-badge { background: #e2e3e5; padding: 3px 6px; border-radius: 4px; font-size: 12px; color: #495057; }
+        
+        /* 정렬 버튼 세트 */
+        .order-btn-set button { background: #f1f3f5; border: 1px solid #ced4da; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; margin-left: 2px; }
+        .order-btn-set button:active { background: #dee2e6; }
+
+        /* 상세 입출고 내역 및 개별 수정 */
         .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
         .history-content.show { display: block; }
-        .log-row { padding: 8px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: flex-start; }
+        .log-row { padding: 10px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: center; }
         .log-row:last-child { border-bottom: none; }
-        .log-txt { font-weight: 500; }
-        .log-time { font-size: 12px; color: #6c757d; text-align: right; }
-        .log-note { font-size: 12px; color: #757575; background: #fff; padding: 4px 8px; border-radius: 4px; border: 1px solid #e9ecef; margin-top: 4px; }
+        .log-actions { display: flex; gap: 5px; align-items: center; }
+        .sm-edit-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; color: #495057; }
+        .sm-edit-btn:hover { background: #adb5bd; color: white; }
+        .log-note { font-size: 12px; color: #6c757d; margin-top: 3px; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #e9ecef; }
     </style>
 </head>
 <body>
@@ -45,9 +52,17 @@
         <button id="btn-status" onclick="openTab('status')">전체현황</button>
     </div>
 
-    <!-- 1. 메인 화면 (물품 등록) -->
+    <!-- 1. 메인 화면 (물품 등록 + 분류 기능 추가) -->
     <div id="main" class="tab-content active">
         <h2>물품 등록</h2>
+        <div class="form-group">
+            <label>분류 (파일/폴더 선택 및 생성)</label>
+            <select id="itemCategorySelect" onchange="checkNewCategory(this)">
+                <option value="기본분류">기본분류</option>
+                <option value="__NEW__">+ 새 분류 파일 만들기...</option>
+            </select>
+            <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류(파일) 이름을 입력하세요">
+        </div>
         <div class="form-group">
             <label>물품명</label>
             <input type="text" id="itemName" placeholder="예: A형 볼트">
@@ -96,12 +111,10 @@
     </div>
 
     <!-- 4. 전체 현황 화면 -->
-    <div id="status" class="tab-content status-container">
-        <h2>전체 물품 현황 (이름순)</h2>
-        <p style="font-size:12px; color:#6c757d; margin-top:-10px;">* 물품 목록을 누르면 상세 입출고 시간이 열립니다.</p>
-        <div id="itemStatusList">
-            <!-- 물품 이름순 정렬 카드들이 여기에 출력됩니다 -->
-        </div>
+    <div id="status" class="tab-content">
+        <h2>전체 현황판</h2>
+        <p style="font-size:12px; color:#6c757d; margin-top:-10px;">* 물품 카드를 누르면 상세 입출고 시간이 나오며, 건별 수정이 가능합니다.<br>* ▲ ▼ 버튼으로 원하는 정렬 순서를 임의로 바꿀 수 있습니다.</p>
+        <div id="itemStatusList"></div>
     </div>
 
     <script>
@@ -117,6 +130,7 @@
 
         window.onload = function() {
             loadItems();
+            loadCategories();
         };
 
         function openTab(tabId) {
@@ -126,60 +140,89 @@
             document.getElementById(tabId).classList.add('active');
             document.getElementById(`btn-${tabId}`).classList.add('active-btn');
             
+            if(tabId === 'main') loadCategories();
             if(tabId === 'status') loadInventoryStatus();
             if(tabId === 'inflow' || tabId === 'outflow') loadItems();
         }
 
-        async function loadItems() {
-            try {
-                const response = await fetch(`${BASE_URL}/items?select=name&order=name.asc`, { headers });
-                const data = await response.json();
-
-                const inSelect = document.getElementById('inItemSelect');
-                const outSelect = document.getElementById('outItemSelect');
-                
-                let options = '<option value="">물품을 선택하세요</option>';
-                data.forEach(item => {
-                    options += `<option value="${item.name}">${item.name}</option>`;
-                });
-                
-                inSelect.innerHTML = options;
-                outSelect.innerHTML = options;
-            } catch (error) {
-                console.error(error);
+        // 분류 선택 감지 (새 분류 만들기 분기)
+        function checkNewCategory(select) {
+            const input = document.getElementById('newCategoryInput');
+            if(select.value === '__NEW__') {
+                input.style.display = 'block';
+                input.focus();
+            } else {
+                input.style.display = 'none';
             }
         }
 
-        // 1. 물품 등록
+        // 등록된 모든 분류 파일 목록 불러오기
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${BASE_URL}/items?select=category`, { headers });
+                const data = await response.json();
+                const categories = ['기본분류', ...new Set(data.map(item => item.category).filter(Boolean))];
+                
+                const select = document.getElementById('itemCategorySelect');
+                let options = '';
+                categories.forEach(cat => {
+                    options += `<option value="${cat}">${cat}</option>`;
+                });
+                options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
+                select.innerHTML = options;
+                document.getElementById('newCategoryInput').style.display = 'none';
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadItems() {
+            try {
+                const response = await fetch(`${BASE_URL}/items?select=name&order=sort_order.asc`, { headers });
+                const data = await response.json();
+                let options = '<option value="">물품을 선택하세요</option>';
+                data.forEach(item => { options += `<option value="${item.name}">${item.name}</option>`; });
+                document.getElementById('inItemSelect').innerHTML = options;
+                document.getElementById('outItemSelect').innerHTML = options;
+            } catch (error) { console.error(error); }
+        }
+
+        // 1. 물품 등록 (분류값 포함)
         async function addItem() {
+            const select = document.getElementById('itemCategorySelect');
+            const newInput = document.getElementById('newCategoryInput');
+            let category = select.value;
+            
+            if(category === '__NEW__') {
+                category = newInput.value.trim();
+                if(!category) return alert('새로운 분류 명칭을 입력해 주세요.');
+            }
+
             const name = document.getElementById('itemName').value.trim();
             const memo = document.getElementById('itemMemo').value.trim();
-            
             if(!name) return alert('물품명을 입력해주세요.');
 
             try {
+                // 맨 마지막 순서값 지정을 위해 현재 개수 파악
+                const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
+                const countData = await countRes.json();
+                const nextOrder = countData.length + 1;
+
                 const response = await fetch(`${BASE_URL}/items`, {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify({ name, memo })
+                    body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
                 });
 
-                if (!response.ok) {
-                    const errData = await response.json();
-                    if(errData.code === '23505') throw new Error('이미 등록된 물품입니다.');
-                    throw new Error(errData.message);
-                }
+                if (!response.ok) throw new Error('이미 등록된 물품이거나 오류가 발생했습니다.');
 
-                alert(`[${name}] 등록 완료!`);
+                alert(`[${category} > ${name}] 등록 완료!`);
                 document.getElementById('itemName').value = '';
                 document.getElementById('itemMemo').value = '';
-                loadItems();
-            } catch (error) {
-                alert(error.message);
-            }
+                newInput.value = '';
+                loadCategories();
+            } catch (error) { alert(error.message); }
         }
 
-        // 2 & 3. 입고 및 출고
+        // 2 & 3. 입출고 기록 등록
         async function logStock(type) {
             const prefix = type === '입고' ? 'in' : 'out';
             const itemName = document.getElementById(`${prefix}ItemSelect`).value;
@@ -195,25 +238,21 @@
                     headers,
                     body: JSON.stringify({ type, item_name: itemName, count, note })
                 });
-
                 if (!response.ok) throw new Error('기록 실패');
-
                 alert(`${itemName} ${count}개 ${type} 완료!`);
                 document.getElementById(`${prefix}Count`).value = '';
                 document.getElementById(`${prefix}Note`).value = '';
-            } catch (error) {
-                alert(error.message);
-            }
+            } catch (error) { alert(error.message); }
         }
 
-        // 4. 물품 이름순 정렬 리스트 + 누르면 상세 정렬 및 수정 기능
+        // 4. 전체 현황판 (분류별 묶음 + 임의 정렬 + 건별 수정)
         async function loadInventoryStatus() {
             const container = document.getElementById('itemStatusList');
-            container.innerHTML = '현황 로딩 중...';
+            container.innerHTML = '현황판을 빌드 중입니다...';
 
             try {
-                // 물품 리스트와 입출고 로그 한 번에 다 긁어오기
-                const itemRes = await fetch(`${BASE_URL}/items?select=*&order=name.asc`, { headers });
+                // sort_order 기준으로 물품 가져오기
+                const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
                 const itemsData = await itemRes.json();
 
                 const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
@@ -225,101 +264,127 @@
                     return;
                 }
 
-                // 각 물품별로 카드 그리기
+                // 분류(Category)별로 그룹 묶기
+                const groups = {};
                 itemsData.forEach(item => {
-                    // 해당 물품의 로그 필터링
-                    const itemLogs = logsData.filter(log => log.item_name === item.name);
-                    
-                    // 현재 남은 재고 수량 계산 (입고 더하고 출고 빼기)
-                    let totalStock = 0;
-                    itemLogs.forEach(l => {
-                        if(l.type === '입고') totalStock += l.count;
-                        if(l.type === '출고') totalStock -= l.count;
-                    });
-
-                    const card = document.createElement('div');
-                    card.className = 'item-card';
-
-                    // 히스토리 내역 HTML 빌드
-                    let historyHtml = '';
-                    if(itemLogs.length === 0) {
-                        historyHtml = '<div style="color:#999; text-align:center; padding:10px;">입출고 내역이 없습니다.</div>';
-                    } else {
-                        itemLogs.forEach(log => {
-                            const dt = new Date(log.created_at);
-                            const dateStr = dt.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
-                            const timeStr = dt.toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' });
-
-                            historyHtml += `
-                                <div class="log-row">
-                                    <div>
-                                        <span class="log-txt" style="color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                        <strong>${log.count}개</strong>
-                                        ${log.note ? `<div class="log-note">✏️ ${log.note}</div>` : ''}
-                                    </div>
-                                    <div class="log-time">${dateStr}<br>${timeStr}</div>
-                                </div>
-                            `;
-                        });
-                    }
-
-                    // 카드 본문 구성
-                    card.innerHTML = `
-                        <div class="item-header" onclick="toggleHistory(this)">
-                            <div class="item-info">
-                                <span class="item-title">${item.name}</span>
-                                <span class="stock-badge">재고: ${totalStock}개</span>
-                            </div>
-                            <button class="edit-btn" onclick="editItemName('${item.id}', '${item.name}', event)">이름 수정</button>
-                        </div>
-                        <div class="history-content">
-                            <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:8px;">📋 입출고 내역 리스트 (최신순)</div>
-                            ${historyHtml}
-                        </div>
-                    `;
-                    container.appendChild(card);
+                    const cat = item.category || '기본분류';
+                    if(!groups[cat]) groups[cat] = [];
+                    groups[cat].push(item);
                 });
 
-            } catch (error) {
-                container.innerHTML = '현황 로드 실패: ' + error.message;
-            }
+                // 분류별 화면 렌더링
+                for (const catName in groups) {
+                    const section = document.createElement('div');
+                    section.className = 'category-section';
+                    section.innerHTML = `<div class="category-title">📁 ${catName}</div>`;
+
+                    groups[catName].forEach((item, idx) => {
+                        const itemLogs = logsData.filter(log => log.item_name === item.name);
+                        
+                        let totalStock = 0;
+                        itemLogs.forEach(l => {
+                            if(l.type === '입고') totalStock += l.count;
+                            if(l.type === '출고') totalStock -= l.count;
+                        });
+
+                        const card = document.createElement('div');
+                        card.className = 'item-card';
+
+                        // 입출고 내역 리스트업 (건별 수정버튼 부착)
+                        let historyHtml = '';
+                        if(itemLogs.length === 0) {
+                            historyHtml = '<div style="color:#999; text-align:center; padding:10px;">기록이 없습니다.</div>';
+                        } else {
+                            itemLogs.forEach(log => {
+                                const dt = new Date(log.created_at);
+                                const timeStr = `${dt.toLocaleDateString('ko-KR')} ${dt.toLocaleTimeString('ko-KR',{hour12:false,hour:'2-digit',minute:'2-digit'})}`;
+
+                                historyHtml += `
+                                    <div class="log-row">
+                                        <div>
+                                            <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
+                                            <strong>${log.count}개</strong> <span style="font-size:12px; color:#777;">(${timeStr})</span>
+                                            ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
+                                        </div>
+                                        <div class="log-actions">
+                                            <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}')">수정</button>
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        }
+
+                        // 순서 이동을 위한 이전/다음 아이템 정의
+                        const prevId = idx > 0 ? groups[catName][idx-1].id : null;
+                        const prevOrder = idx > 0 ? groups[catName][idx-1].sort_order : null;
+                        const nextId = idx < groups[catName].length - 1 ? groups[catName][idx+1].id : null;
+                        const nextOrder = idx < groups[catName].length - 1 ? groups[catName][idx+1].sort_order : null;
+
+                        card.innerHTML = `
+                            <div class="item-header" onclick="toggleHistory(this)">
+                                <div class="item-info">
+                                    <span class="item-title">${item.name}</span>
+                                    <span class="stock-badge">재고: ${totalStock}개</span>
+                                </div>
+                                <div class="order-btn-set">
+                                    <button onclick="moveOrder('${item.id}', ${item.sort_order}, '${prevId}', ${prevOrder}, event)">▲</button>
+                                    <button onclick="moveOrder('${item.id}', ${item.sort_order}, '${nextId}', ${nextOrder}, event)">▼</button>
+                                </div>
+                            </div>
+                            <div class="history-content">
+                                <div style="font-size:11px; font-weight:bold; color:#777; margin-bottom:5px;">상세 내역 편집</div>
+                                ${historyHtml}
+                            </div>
+                        `;
+                        section.appendChild(card);
+                    });
+                    container.appendChild(section);
+                }
+            } catch (error) { container.innerHTML = '로드 실패: ' + error.message; }
         }
 
-        // 접이식 토글 기능
         function toggleHistory(headerElement) {
-            const content = headerElement.nextElementSibling;
-            content.classList.toggle('show');
+            headerElement.nextElementSibling.classList.toggle('show');
         }
 
-        // 물품 이름 수정 기능
-        async function editItemName(id, oldName, event) {
-            event.stopPropagation(); // 카드 닫히는 현상 방지
-            
-            const newName = prompt(`[${oldName}]의 새로운 물품명을 입력하세요:`, oldName);
-            if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+        /* [기능 1] 입출고 상세 내역 건별 수정 기능 */
+        async function editLogDetail(logId, currentType, currentCount, currentNote) {
+            const newType = prompt("구분을 입력하세요 (입고 또는 출고):", currentType);
+            if(!newType || (newType !== '입고' && newType !== '출고')) return alert('입고 또는 출고만 입력 가능합니다.');
+
+            const newCountStr = prompt("변경할 수량을 입력하세요:", currentCount);
+            const newCount = parseInt(newCountStr);
+            if(isNaN(newCount) || newCount <= 0) return alert('올바른 수량을 입력해주세요.');
+
+            const newNote = prompt("특이사항/메모를 입력하세요:", currentNote);
 
             try {
-                // 1. 물품명 테이블 정보 업데이트
-                const res1 = await fetch(`${BASE_URL}/items?id=eq.${id}`, {
+                const res = await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, {
                     method: 'PATCH',
                     headers,
-                    body: JSON.stringify({ name: newName.trim() })
+                    body: JSON.stringify({ type: newType, count: newCount, note: newNote })
                 });
-
-                if(!res1.ok) throw new Error('이름 수정에 실패했습니다.');
-
-                // 2. 연결된 기존 입출고 기록들의 물품명도 일괄 업데이트
-                await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldName}`, {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify({ item_name: newName.trim() })
-                });
-
-                alert('물품명이 성공적으로 수정되었습니다.');
+                if(!res.ok) throw new Error('수정 실패');
+                alert('해당 입출고 기록이 정정되었습니다.');
                 loadInventoryStatus();
-            } catch (error) {
-                alert(error.message);
-            }
+            } catch (e) { alert(e.message); }
+        }
+
+        /* [기능 2] 임의 정렬 위/아래 이동 처리 기능 */
+        async function moveOrder(currentId, currentOrder, targetId, targetOrder, event) {
+            event.stopPropagation(); // 카드 열림 방지
+            if(!targetId || targetId === 'null') return; // 맨 위나 맨 아래면 무시
+
+            try {
+                // 두 아이템의 sort_order 스와핑(맞바꾸기)
+                await fetch(`${BASE_URL}/items?id=eq.${currentId}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: targetOrder })
+                });
+                await fetch(`${BASE_URL}/items?id=eq.${targetId}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: currentOrder })
+                });
+                loadInventoryStatus();
+            } catch (e) { alert('순서 변경 실패: ' + e.message); }
         }
     </script>
 </body>
