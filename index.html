@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>자재 입출고 관리 시스템 Pro</title>
-    <!-- 드래그 앤 드롭을 부드럽고 완벽하게 지원하는 SortableJS 라이브러리 추가 -->
+    <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
@@ -22,30 +22,30 @@
         
         /* 분류 파일 섹션 스타일 */
         .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; position: relative; }
-        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; position: relative; }
+        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* 더보기 메뉴 드롭다운 스타일 */
+        /* [개선] 더보기 메뉴 드롭다운 - 카드 밖으로 완벽하게 탈출하도록 고정형(fixed) 레이아웃 적용 */
         .more-menu-container { position: relative; display: inline-block; }
         .more-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; color: #6c757d; font-weight: bold; }
-        .more-dropdown { display: none; position: absolute; right: 0; top: 28px; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-radius: 6px; z-index: 100; min-width: 140px; overflow: hidden; }
+        .more-dropdown { display: none; position: fixed; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
         .more-dropdown.show { display: block; }
-        .more-dropdown button, .more-dropdown .drag-handle-item { width: 100%; padding: 10px 12px; border: none; background: white; text-align: left; font-size: 13px; cursor: pointer; color: #333; display: block; box-sizing: border-box; text-decoration: none; }
-        .more-dropdown button:hover, .more-dropdown .drag-handle-item:hover { background: #f1f3f5; }
+        .more-dropdown button { width: 100%; padding: 11px 14px; border: none; background: white; text-align: left; font-size: 13px; cursor: pointer; color: #333; display: block; box-sizing: border-box; }
+        .more-dropdown button:hover { background: #f1f3f5; }
         .more-dropdown button.del-action { color: #dc3545; }
+        .more-dropdown button.mode-active-btn { background: #e3f2fd; color: #0d6efd; font-weight: bold; }
         
-        /* 드래그 핸들 전용 디자인 */
-        .drag-handle-item { cursor: grab; background: #f8f9fa; font-weight: bold; color: #0d6efd; }
-        .drag-handle-item:active { cursor: grabbing; }
+        /* [개선] 정렬 모드 활성화 시 직관적인 시각 피드백 추가 */
+        .sort-mode-folder-active { border: 2px solid #0d6efd !important; background: #f1f8ff !important; cursor: move !important; }
+        .sort-mode-item-active { border: 2px dashed #ffc107 !important; background: #fffde7 !important; cursor: move !important; }
 
         /* 물품 카드 스타일 */
-        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; }
+        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; position: relative; }
         .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
         .item-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
         .stock-badge { background: #e2e3e5; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #111; border: 1px solid #ced4da; font-weight: 800; }
         
-        /* 드래그 애니메이션 효과 */
-        .sortable-ghost { opacity: 0.4; background: #e2e3e5 !important; }
-        .sortable-chosen { background: #fffde7 !important; }
+        .sortable-ghost { opacity: 0.3; background: #ced4da !important; }
+        .sortable-chosen { box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important; }
 
         .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
         .history-content.show { display: block; }
@@ -59,7 +59,7 @@
         .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
         .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
 
-        /* 스티커 메모장 전용 스타일 */
+        /* 메모장 전용 스타일 */
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
         .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .notepad-title { font-size: 18px; font-weight: bold; color: #202020; }
@@ -167,7 +167,7 @@
         <button class="btn btn-danger" style="width:100%; padding:14px; font-size:16px;" onclick="logStock('출고')">출고 완료</button>
     </div>
 
-    <!-- 5. 전체 현황 화면 (드래그 기능 탑재) -->
+    <!-- 5. 전체 현황 화면 -->
     <div id="status" class="tab-content">
         <h2>전체 현황판</h2>
         
@@ -177,10 +177,10 @@
         </div>
 
         <p style="font-size:12px; color:#6c757d; margin-top:-5px;">
-            * 더보기(⋮) 메뉴 내부의 <b>[↕️ 위치 이동]</b>을 꾹 누르고 끌어당기면 파일 폴더 및 물품의 순서를 실시간 정렬할 수 있습니다.
+            * 더보기(⋮) 메뉴에서 <b>[정렬 모드 켜기]</b>를 누르면 꾹 누르고 있을 필요 없이 해당 카드를 자유롭게 끌어서 이동할 수 있습니다.
         </p>
         
-        <!-- 분류 파일들이 정렬될 최상위 컨테이너 -->
+        <!-- 분류 파일 리스트 컨테이너 -->
         <div id="itemStatusList">데이터를 불러오는 중...</div>
     </div>
 
@@ -197,6 +197,10 @@
 
         let globalCategories = [];
         let stickyNotes = [];
+        
+        // Sortable 인스턴스 참조 보관용 객체
+        let folderSortableInstance = null;
+        let itemSortableInstances = {};
 
         function openTab(tabId) {
             try {
@@ -226,7 +230,6 @@
                     saveNotesToLocalStorage();
                 }
 
-                // 로컬 저장소에 저장된 폴더 순서 데이터 로드
                 const savedCatOrder = localStorage.getItem('system_category_order');
                 if (savedCatOrder) {
                     globalCategories = JSON.parse(savedCatOrder);
@@ -236,11 +239,16 @@
                 loadCategories();
             } catch(e) { console.error(e); }
             
+            // 더보기 메뉴 외 영역 클릭 시 드롭다운 닫기
             window.addEventListener('click', function(e) {
                 if(!e.target.classList.contains('more-btn')) {
                     document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
                 }
             });
+
+            // 스크롤이나 리사이즈 시 떠 있는 드롭다운 위치 동적 변경 보정
+            window.addEventListener('scroll', updateOpenDropdownPosition, true);
+            window.addEventListener('resize', updateOpenDropdownPosition);
         };
 
         /* --- 스티커 메모장 로직 --- */
@@ -289,7 +297,7 @@
             });
         }
 
-        /* --- 코어 자재 데이터 로직 --- */
+        /* --- 자재 데이터 제어 로직 --- */
         function checkNewCategory(select) {
             const input = document.getElementById('newCategoryInput');
             if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
@@ -306,7 +314,6 @@
                 const data = await response.json();
                 const dbCats = Array.isArray(data) ? data.map(item => normalizeCategory(item.category)) : [];
                 
-                // 기존 순서 유지하면서 새 폴더 병합
                 const uniqueCats = [...new Set(dbCats)].filter(c => c !== '기본분류');
                 
                 if (globalCategories.length === 0) {
@@ -410,12 +417,118 @@
             loadInventoryStatus();
         }
 
+        /* [개선] 밖으로 튀어나오도록 드롭다운 고정(Fixed) 좌표 연산 처리 */
         function toggleMoreMenu(event) {
             event.stopPropagation();
-            const dropdown = event.target.nextElementSibling;
+            const btn = event.target;
+            const dropdown = btn.nextElementSibling;
             const isOpen = dropdown.classList.contains('show');
+            
             document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
-            if(!isOpen && dropdown) dropdown.classList.add('show');
+            
+            if(!isOpen && dropdown) {
+                dropdown.classList.add('show');
+                btn.setAttribute('data-active-dropdown', 'true');
+                positionDropdown(btn, dropdown);
+            } else {
+                btn.removeAttribute('data-active-dropdown');
+            }
+        }
+
+        function positionDropdown(btn, dropdown) {
+            const rect = btn.getBoundingClientRect();
+            // 버튼의 우측 아래 끝단에 맞추어 화면 고정 좌표(fixed position) 설정
+            dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
+            dropdown.style.left = (rect.right - dropdown.offsetWidth + window.scrollX) + 'px';
+            dropdown.style.position = 'fixed';
+        }
+
+        function updateOpenDropdownPosition() {
+            const activeBtn = document.querySelector('[data-active-dropdown="true"]');
+            if (activeBtn) {
+                const dropdown = activeBtn.nextElementSibling;
+                if (dropdown && dropdown.classList.contains('show')) {
+                    positionDropdown(activeBtn, dropdown);
+                }
+            }
+        }
+
+        /* [개선] 대분류 폴더 이동 정렬 토글 모드 */
+        function toggleFolderSortMode(catName, btn, event) {
+            event.stopPropagation();
+            const container = document.getElementById('itemStatusList');
+            const targetSection = document.querySelector(`.category-section[data-catname="${catName}"]`);
+            
+            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
+
+            if (folderSortableInstance && folderSortableInstance.options.disabled === false) {
+                // 이미 켜져있는 경우 종료 처리
+                folderSortableInstance.destroy();
+                folderSortableInstance = null;
+                document.querySelectorAll('.category-section').forEach(s => s.classList.remove('sort-mode-folder-active'));
+                alert('📁 분류 폴더 정렬이 고정 및 저장되었습니다.');
+                loadInventoryStatus();
+                return;
+            }
+
+            // 정렬 모드 시작 활성화
+            document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
+            
+            folderSortableInstance = Sortable.create(container, {
+                animation: 200,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                onEnd() {
+                    const sections = container.querySelectorAll('.category-section');
+                    const newFolderOrder = [];
+                    sections.forEach(sec => {
+                        newFolderOrder.push(sec.getAttribute('data-catname'));
+                    });
+                    globalCategories = newFolderOrder;
+                    localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
+                }
+            });
+
+            alert(`[${catName}] 폴더 정렬 기능이 켜졌습니다.\n이제 파란색 칸 아무 곳이나 붙잡고 원하는 곳으로 위아래로 끌어서 움직이세요.\n완료되면 다시 더보기에서 [정렬 완료]를 누르세요.`);
+        }
+
+        /* [개선] 폴더 내부 물품 카드 이동 정렬 토글 모드 */
+        function toggleItemSortMode(catName, itemId, btn, event) {
+            event.stopPropagation();
+            const targetSection = document.querySelector(`.category-section[data-catname="${catName}"]`);
+            const dragContainer = targetSection.querySelector('.items-drag-container');
+            
+            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
+
+            if (itemSortableInstances[catName]) {
+                // 이미 켜져있는 경우 종료 처리
+                itemSortableInstances[catName].destroy();
+                delete itemSortableInstances[catName];
+                dragContainer.querySelectorAll('.item-card').forEach(c => c.classList.remove('sort-mode-item-active'));
+                alert('📦 물품 정렬이 고정 및 완료되었습니다.');
+                loadInventoryStatus();
+                return;
+            }
+
+            // 물품 정렬 모드 시작 활성화
+            dragContainer.querySelectorAll('.item-card').forEach(c => c.classList.add('sort-mode-item-active'));
+
+            itemSortableInstances[catName] = Sortable.create(dragContainer, {
+                animation: 200,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                async onEnd() {
+                    const cards = dragContainer.querySelectorAll('.item-card');
+                    for(let i = 0; i < cards.length; i++) {
+                        const id = cards[i].getAttribute('data-itemid');
+                        await fetch(`${BASE_URL}/items?id=eq.${id}`, {
+                            method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
+                        });
+                    }
+                }
+            });
+
+            alert(`해당 폴더 내부의 물품 정렬이 활성화되었습니다.\n노란색 박스 아무 곳이나 편하게 마우스로 잡고 끌어서 위아래 배치 정렬하세요.\n배치가 끝나면 다시 더보기에서 [정렬 완료]를 클릭하세요.`);
         }
 
         async function renameCategoryFromStatus(oldCatName, event) {
@@ -447,7 +560,7 @@
             } catch(e) { alert(e.message); }
         }
 
-        /* --- 드래그 앤 드롭 구현을 포함한 현황판 출력 로직 --- */
+        /* --- 현황판 렌더링 로직 --- */
         async function loadInventoryStatus() {
             const container = document.getElementById('itemStatusList');
             if(!container) return;
@@ -465,7 +578,6 @@
                 itemsData.forEach(item => { item.category = normalizeCategory(item.category); });
                 const activeDbCategories = itemsData.map(item => item.category);
                 
-                // 순서 보정용 융합
                 let allCategories = [...globalCategories];
                 activeDbCategories.forEach(c => { if(!allCategories.includes(c)) allCategories.push(c); });
                 allCategories = allCategories.filter(c => c && c !== '기본분류');
@@ -480,20 +592,24 @@
                     section.className = 'category-section';
                     section.setAttribute('data-catname', catName);
                     
+                    // 폴더 상태 판별
+                    const isFolderSortActive = folderSortableInstance !== null;
+                    const folderBtnText = isFolderSortActive ? "🔒 정렬 완료 (고정)" : "↕️ 폴더 위치 이동 켜기";
+                    const folderBtnClass = isFolderSortActive ? "mode-active-btn" : "";
+
                     section.innerHTML = `
                         <div class="category-title">
                             <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span></div>
                             <div class="more-menu-container">
                                 <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                 <div class="more-dropdown">
-                                    <!-- 요구사항: 위치이동 전용 드래그 핸들러 배치 -->
-                                    <div class="drag-handle-item folder-drag-handle">↕️ 위치 이동 (드래그)</div>
+                                    <!-- [개선] 꾹 누르지 않고 온오프 클릭 방식으로 변환 -->
+                                    <button class="${folderBtnClass}" onclick="toggleFolderSortMode('${catName}', this, event)">${folderBtnText}</button>
                                     <button onclick="renameCategoryFromStatus('${catName}', event)">✏️ 이름 수정</button>
                                     <button class="del-action" onclick="deleteCategoryFromStatus('${catName}', event)">🗑️ 분류 전체삭제</button>
                                 </div>
                             </div>
                         </div>
-                        <!-- 내부 아이템 리스트 박스 -->
                         <div class="items-drag-container" style="min-height:20px;"></div>
                     `;
 
@@ -513,6 +629,10 @@
                             const card = document.createElement('div');
                             card.className = 'item-card';
                             card.setAttribute('data-itemid', item.id);
+                            
+                            const isItemSortActive = itemSortableInstances[catName] !== undefined;
+                            const itemBtnText = isItemSortActive ? "🔒 정렬 완료 (고정)" : "↕️ 물품 순서 조정 켜기";
+                            const itemBtnClass = isItemSortActive ? "mode-active-btn" : "";
 
                             let historyHtml = '';
                             if(itemLogs.length === 0) {
@@ -545,8 +665,8 @@
                                     <div class="more-menu-container">
                                         <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                         <div class="more-dropdown">
-                                            <!-- 요구사항: 내부 물품 순서조정 핸들러 배치 -->
-                                            <div class="drag-handle-item item-drag-handle">↕️ 순서 조정 (드래그)</div>
+                                            <!-- [개선] 내부 아이템 역시 클릭식 토글 모드로 제어 -->
+                                            <button class="${itemBtnClass}" onclick="toggleItemSortMode('${catName}', '${item.id}', this, event)">${itemBtnText}</button>
                                             <button onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 다른 분류로 이동</button>
                                             <button class="del-action" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">🗑️ 물품 삭제</button>
                                         </div>
@@ -558,46 +678,12 @@
                         });
                     }
                     container.appendChild(section);
-
-                    // 각 파일(폴더) 내부의 물품들을 정렬하는 Sortable 주입
-                    Sortable.create(dragContainer, {
-                        handle: '.item-drag-handle', // 물품용 드래그 감지 컴포넌트 지정
-                        animation: 180,
-                        ghostClass: 'sortable-ghost',
-                        chosenClass: 'sortable-chosen',
-                        async onEnd() {
-                            // 드래그가 종료되면 새로운 순서를 계산하여 데이터베이스 일괄 정렬 업데이트 진행
-                            const cards = dragContainer.querySelectorAll('.item-card');
-                            for(let i=0; i<cards.length; i++) {
-                                const id = cards[i].getAttribute('data-itemid');
-                                await fetch(`${BASE_URL}/items?id=eq.${id}`, {
-                                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
-                                });
-                            }
-                        }
-                    });
-                });
-
-                // 대분류 폴더 자체를 정렬하는 최상위 Sortable 주입
-                Sortable.create(container, {
-                    handle: '.folder-drag-handle', // 폴더이동용 드래그 감지 컴포넌트 지정
-                    animation: 180,
-                    ghostClass: 'sortable-ghost',
-                    onEnd() {
-                        const sections = container.querySelectorAll('.category-section');
-                        const newFolderOrder = [];
-                        sections.forEach(sec => {
-                            newFolderOrder.push(sec.getAttribute('data-catname'));
-                        });
-                        globalCategories = newFolderOrder;
-                        localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                    }
                 });
 
             } catch (error) { console.error(error); }
         }
 
-        /* --- 부속 편집 유틸리티 액션 함수들 --- */
+        /* --- 유틸리티 편집 액션 함수들 --- */
         function toggleHistory(headerElement) {
             if(headerElement && headerElement.nextElementSibling && !event.target.classList.contains('more-btn')) {
                 headerElement.nextElementSibling.classList.toggle('show');
