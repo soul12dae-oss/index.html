@@ -6,8 +6,8 @@
     <title>자재 입출고 관리 시스템 Pro</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <!-- 엑셀 다운로드 라이브러리 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 엑셀 다운로드 및 스타일 지원 라이브러리 교체 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
         .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; }
@@ -938,33 +938,39 @@
                 const wsIn = XLSX.utils.aoa_to_sheet(inRows);
                 const wsOut = XLSX.utils.aoa_to_sheet(outRows);
 
-                // --- 스타일 정의 영역 (이미지 색상 가이드 반영) ---
+                // --- xlsx-js-style 전용 셀 서식 스타일 데이터 매핑 ---
                 const titleStyle = {
-                    fill: { fgColor: { rgb: "FFFF00" } }, // 밝은 노란색 채우기
+                    fill: { patternType: "solid", fgColor: { rgb: "FFFF00" } },
                     font: { bold: true, size: 14 }
                 };
 
                 const headerStyle = {
-                    fill: { fgColor: { rgb: "D9D9D9" } }, // 회색 배경
-                    font: { bold: true },
-                    alignment: { horizontal: "center", vertical: "center" } // 정렬 스타일 추가
+                    fill: { patternType: "solid", fgColor: { rgb: "D9D9D9" } },
+                    font: { bold: true, size: 11 },
+                    alignment: { horizontal: "center", vertical: "center" },
+                    border: {
+                        top: { style: "thin", color: { rgb: "000000" } },
+                        bottom: { style: "thin", color: { rgb: "000000" } },
+                        left: { style: "thin", color: { rgb: "000000" } },
+                        right: { style: "thin", color: { rgb: "000000" } }
+                    }
                 };
 
-                // 1. 월별재고현황 스타일 주입
+                // 1. 월별재고현황 서식 주입
                 if(wsStatus["B2"]) wsStatus["B2"].s = titleStyle;
                 for(let col = 1; col <= 4; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsStatus[cellRef]) wsStatus[cellRef].s = headerStyle;
                 }
 
-                // 2. 입고현황 스타일 주입
+                // 2. 입고현황 서식 주입
                 if(wsIn["B2"]) wsIn["B2"].s = titleStyle;
                 for(let col = 1; col <= 5; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsIn[cellRef]) wsIn[cellRef].s = headerStyle;
                 }
 
-                // 3. 출고현황 스타일 주입
+                // 3. 출고현황 서식 주입
                 if(wsOut["B2"]) wsOut["B2"].s = titleStyle;
                 for(let col = 1; col <= 5; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
@@ -981,7 +987,6 @@
                 XLSX.utils.book_append_sheet(wb, wsOut, "출고현황");
 
                 const dateInfo = targetMonth.trim() !== "" ? targetMonth.trim() : "전체기간";
-                // 파일명을 '시스템사업부 자재관리'로 수정
                 XLSX.writeFile(wb, `시스템사업부 자재관리_${dateInfo}.xlsx`);
                 
             } catch (e) {
