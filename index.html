@@ -1,967 +1,132 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>자재 입출고 관리 시스템 Pro</title>
-    <!-- 드래그 앤 드롭 라이브러리 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <!-- 엑셀 다운로드 라이브러리 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
-        .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; }
-        .nav button { color: #cfd4da; background: none; border: none; font-size: 15px; font-weight: bold; cursor: pointer; padding: 8px; }
-        .nav button.active-btn { color: #fff; border-bottom: 2px solid #fff; }
-        .tab-content { display: none; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); max-width: 600px; margin: 0 auto; }
-        .active { display: block; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; }
-        .form-group textarea { height: 60px; resize: none; }
-        button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        button.btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; cursor: pointer; font-weight: bold; }
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+# 1. 워크북 및 시트 생성
+wb = openpyxl.Workbook()
+ws = wb.active
+ws.title = "자재관리"
+ws.views.sheetView[0].showGridLines = True  # 눈금선 표시
+
+# 2. 스타일 정의
+font_title = Font(name="맑은 고딕", size=14, bold=True)
+font_header = Font(name="맑은 고딕", size=11, bold=True)
+font_data = Font(name="맑은 고딕", size=11)
+
+fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+fill_gray = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+
+align_center = Alignment(horizontal="center", vertical="center")
+align_left = Alignment(horizontal="left", vertical="center")
+align_right = Alignment(horizontal="right", vertical="center")
+
+thin_border = Border(
+    left=Side(style="thin", color="D3D3D3"),
+    right=Side(style="thin", color="D3D3D3"),
+    top=Side(style="thin", color="D3D3D3"),
+    bottom=Side(style="thin", color="D3D3D3")
+)
+
+# 3. 데이터 정의
+# (1) 제품 총 재고 현황
+stock_title = "2026년 7월 제품 총 재고 현황"
+stock_headers = ["분류", "제품명", "1일 총 개수", "마지막일 총 개수"]
+stock_data = [
+    ["조명제어", "1구", 0, 222],
+    ["피크제어", "리얼시스", 0, 10],
+    ["피크제어", "삼성중계기", 0, 123]
+]
+
+# (2) 입고 현황
+receiving_title = "입 고 현 황"
+receiving_headers = ["입고날짜", "분류", "제품명", "입고수량", "비고"]
+receiving_data = [
+    ["2026-07-06", "피크제어", "리얼시스", 5, ""],
+    ["2026-07-06", "기존분류", "ㄴㅇㄹ", 123, "asd"],
+    ["2026-07-06", "피크제어", "리얼시스", 8, ""],
+    ["2026-07-06", "피크제어", "삼성중계기", 123, ""],
+    ["2026-07-06", "조명제어", "1구", 222, "DF"]
+]
+
+# (3) 출고 현황
+shipping_title = "출 고 현 황"
+shipping_headers = ["출고날짜", "분류", "제품명", "출고수량", "비고"]
+shipping_data = [
+    ["2026-07-06", "피크제어", "리얼시스", 3, "예시데이터"]  # 필요에 따라 변경 가능
+]
+
+# 4. 엑셀에 데이터 및 서식 작성 함수
+def write_table(start_row, title, headers, data, is_stock_table=False):
+    # 제목 작성
+    ws.cell(row=start_row, column=1, value=title)
+    if is_stock_table:
+        # '제품 총 재고 현황'만 A열부터 D열까지 노란색 채우기
+        for col in range(1, 5):
+            cell = ws.cell(row=start_row, column=col)
+            cell.fill = fill_yellow
+            cell.font = font_title
+    else:
+        # 입고/출고 현황은 텍스트만 서식 적용 (배경색 없음)
+        ws.cell(row=start_row, column=1).font = font_title
+    
+    # 헤더 작성
+    header_row = start_row + 2
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=header_row, column=col_idx, value=header)
+        cell.font = font_header
+        cell.fill = fill_gray
+        cell.alignment = align_left if col_idx <= 2 else align_center
+        cell.border = thin_border
         
-        .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; position: relative; transition: all 0.2s; }
-        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-        
-        .more-menu-container { position: relative; display: inline-block; }
-        .more-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; color: #6c757d; font-weight: bold; }
-        .more-dropdown { display: none; position: fixed; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
-        .more-dropdown.show { display: block; }
-        .more-dropdown button { width: 100%; padding: 11px 14px; border: none; background: white; text-align: left; font-size: 13px; cursor: pointer; color: #333; display: block; box-sizing: border-box; }
-        .more-dropdown button:hover { background: #f1f3f5; }
-        .more-dropdown button.del-action { color: #dc3545; }
-        
-        .sort-mode-folder-active { border: 2px dashed #0d6efd !important; background: #f1f8ff !important; cursor: move !important; }
-        .sort-mode-item-active { border: 2px dashed #ffc107 !important; background: #fffde7 !important; cursor: move !important; }
-
-        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; position: relative; transition: all 0.2s; }
-        .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
-        .item-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
-        .stock-badge { background: #e2e3e5; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #111; border: 1px solid #ced4da; font-weight: 800; }
-        
-        .sortable-ghost { opacity: 0.3; background: #ced4da !important; }
-        .sortable-chosen { box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important; }
-
-        .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
-        .history-content.show { display: block; }
-        
-        /* 월 선택기 디자인 */
-        .history-month-filter { display: flex; gap: 8px; background: #e9ecef; padding: 8px; border-radius: 6px; margin-bottom: 10px; align-items: center; }
-        .history-month-filter select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; }
-        .history-month-filter label { font-size: 12px; font-weight: bold; color: #495057; }
-
-        .log-row { padding: 10px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: center; }
-        .log-row:last-child { border-bottom: none; }
-        .log-actions { display: flex; gap: 5px; align-items: center; }
-        .sm-edit-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; color: #495057; }
-        .log-note { font-size: 12px; color: #6c757d; margin-top: 3px; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #e9ecef; }
-        
-        .top-action-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
-        .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        
-        .toggle-sort-btn { background: #fff; color: #495057; border: 2px solid #ced4da; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; transition: all 0.2s; }
-        .toggle-sort-btn.active-mode { background: #0d6efd; color: #fff; border-color: #0d6efd; }
-
-        .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
-        .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .notepad-title { font-size: 18px; font-weight: bold; color: #202020; }
-        .add-note-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0 10px; line-height: 1; }
-        .add-note-btn:hover { color: #000; }
-        .note-search-box { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: #fff; }
-        .notes-list { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; max-height: 500px; padding-right: 5px; }
-        
-        .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; }
-        .note-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .note-date { font-size: 11px; color: #8c824b; font-weight: 500; }
-        .delete-note-btn { background: none; border: none; font-size: 14px; color: #8c824b; cursor: pointer; padding: 0 4px; font-weight: bold; }
-        .delete-note-btn:hover { color: #dc3545; }
-        .note-input-title { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: bold; color: #222; outline: none; padding: 0; margin-bottom: 2px; }
-        .note-input-content { width: 100%; border: none; background: transparent; font-size: 14px; color: #333; outline: none; resize: none; padding: 0; line-height: 1.4; height: 60px; font-family: inherit; }
-
-        @media print {
-            body { background: white; color: black; padding: 0; }
-            .nav, .top-action-bar, p, .more-menu-container, .log-actions, .history-month-filter { display: none !important; }
-            .tab-content { display: none !important; box-shadow: none; padding: 0; max-width: 100%; }
-            #status.tab-content { display: block !important; }
-            .category-section { border: 1px solid #333; background: white; page-break-inside: avoid; }
-            .item-card { border: 1px solid #aaa; background: white; }
-            .stock-badge { border: 1px solid #000; background: #fff; }
-            .history-content { display: block !important; }
-        }
-    </style>
-</head>
-<body>
-
-    <div class="nav">
-        <button id="btn-main" class="active-btn" onclick="openTab('main')">메인(등록)</button>
-        <button id="btn-notepad" onclick="openTab('notepad')">메모장</button>
-        <button id="btn-inflow" onclick="openTab('inflow')">입고</button>
-        <button id="btn-outflow" onclick="openTab('outflow')">출고</button>
-        <button id="btn-status" onclick="openTab('status')">전체현황</button>
-    </div>
-
-    <!-- 1. 메인 화면 -->
-    <div id="main" class="tab-content active">
-        <h2>물품 등록</h2>
-        <div class="form-group">
-            <label>분류 (파일/폴더 선택 및 생성)</label>
-            <select id="itemCategorySelect" onchange="checkNewCategory(this)">
-            </select>
-            <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류(파일) 이름을 입력하세요">
-        </div>
-        <div class="form-group">
-            <label>물품명</label>
-            <input type="text" id="itemName" placeholder="예: A형 볼트">
-        </div>
-        <div class="form-group">
-            <label>기타 메모</label>
-            <input type="text" id="itemMemo" placeholder="규격, 제조사 등">
-        </div>
-        <button class="btn" onclick="addItem()">물품 등록하기</button>
-    </div>
-
-    <!-- 2. 스티커 메모장 화면 -->
-    <div id="notepad" class="tab-content">
-        <div class="notepad-container">
-            <div class="notepad-header">
-                <button class="add-note-btn" onclick="addNewNote()">+</button>
-                <div class="notepad-title">스티커 메모</div>
-                <div style="width:24px;"></div>
-            </div>
-            <input type="text" class="note-search-box" id="noteSearch" oninput="renderNotes()" placeholder="검색...">
-            <div class="notes-list" id="notesList"></div>
-        </div>
-    </div>
-
-    <!-- 3. 입고 화면 -->
-    <div id="inflow" class="tab-content">
-        <h2>자재 입고</h2>
-        <div class="form-group">
-            <label>물품 선택</label>
-            <select id="inItemSelect"><option value="">로딩 중...</option></select>
-        </div>
-        <div class="form-group">
-            <label>입고 수량</label>
-            <input type="number" id="inCount" min="1" placeholder="숫자만 입력">
-        </div>
-        <div class="form-group">
-            <label>특이사항</label>
-            <textarea id="inNote" placeholder="특이사항 입력 (생략 가능)"></textarea>
-        </div>
-        <button class="btn" onclick="logStock('입고')">입고 완료</button>
-    </div>
-
-    <!-- 4. 출고 화면 -->
-    <div id="outflow" class="tab-content">
-        <h2>자재 출고</h2>
-        <div class="form-group">
-            <label>물품 선택</label>
-            <select id="outItemSelect"><option value="">로딩 중...</option></select>
-        </div>
-        <div class="form-group">
-            <label>출고 수량</label>
-            <input type="number" id="outCount" min="1" placeholder="숫자만 입력">
-        </div>
-        <div class="form-group">
-            <label>특이사항</label>
-            <textarea id="outNote" placeholder="특이사항 입력 (생략 가능)"></textarea>
-        </div>
-        <button class="btn btn-danger" style="width:100%; padding:14px; font-size:16px;" onclick="logStock('출고')">출고 완료</button>
-    </div>
-
-    <!-- 5. 전체 현황 화면 -->
-    <div id="status" class="tab-content">
-        <h2>전체 현황판</h2>
-        
-        <div class="top-action-bar">
-            <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
-            <button class="print-btn" style="background: #198754;" onclick="exportToExcel()">📊 Excel 저장</button>
-            <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: OFF</button>
-            <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
-        </div>
-
-        <p style="font-size:12px; color:#6c757d; margin-top:-5px;">
-            * 정렬 모드 버튼을 누르면 파일(파란 점선)과 내부 물품(노란 점선)을 동시에 드래그하여 정렬할 수 있습니다.
-        </p>
-        
-        <div id="itemStatusList">데이터를 불러오는 중...</div>
-    </div>
-
-    <script>
-        const BASE_URL = "https://kvfdfdcaidsdnohfcbeg.supabase.co/rest/v1";
-        const API_KEY = "sb_publishable_AzZQ-7pqFS2klriLNXlCig_xRs8b1vV";
-
-        const headers = {
-            "apikey": API_KEY,
-            "Authorization": `Bearer ${API_KEY}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        };
-
-        let globalCategories = [];
-        let stickyNotes = [];
-        
-        let currentSortMode = 0; 
-        let globalFolderSortable = null;
-        let globalItemSortables = [];
-        let latestRawItems = [];
-        let globalLogsData = []; // 필터링을 위해 로그 데이터 전역 저장
-
-        function openTab(tabId) {
-            try {
-                resetSortModes();
-                
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active-btn'));
-                
-                const targetTab = document.getElementById(tabId);
-                const targetBtn = document.getElementById(`btn-${tabId}`);
-                
-                if (targetTab) targetTab.classList.add('active');
-                if (targetBtn) targetBtn.classList.add('active-btn');
-                
-                if(tabId === 'main') loadCategories();
-                if(tabId === 'status') loadInventoryStatus();
-                if(tabId === 'inflow' || tabId === 'outflow') loadItems();
-                if(tabId === 'notepad') renderNotes();
-            } catch (err) { console.error(err); }
-        }
-
-        function resetSortModes() {
-            if(globalFolderSortable) { globalFolderSortable.destroy(); globalFolderSortable = null; }
-            globalItemSortables.forEach(s => { if(s) s.destroy(); });
-            globalItemSortables = [];
+    # 데이터 작성
+    current_row = header_row + 1
+    for row_data in data:
+        for col_idx, value in enumerate(row_data, 1):
+            cell = ws.cell(row=current_row, column=col_idx, value=value)
+            cell.font = font_data
+            cell.border = thin_border
             
-            currentSortMode = 0;
-            
-            const btn = document.getElementById('globalSortMasterBtn');
-            if(btn) {
-                btn.className = 'toggle-sort-btn';
-                btn.innerText = '↕️ 정렬 모드: OFF';
-            }
-        }
-
-        function rotateSortMode() {
-            currentSortMode = (currentSortMode === 0) ? 1 : 0;
-            const btn = document.getElementById('globalSortMasterBtn');
-            const container = document.getElementById('itemStatusList');
-            
-            if(globalFolderSortable) { globalFolderSortable.destroy(); globalFolderSortable = null; }
-            globalItemSortables.forEach(s => { if(s) s.destroy(); });
-            globalItemSortables = [];
-            document.querySelectorAll('.category-section').forEach(s => s.classList.remove('sort-mode-folder-active'));
-            document.querySelectorAll('.item-card').forEach(c => c.classList.remove('sort-mode-item-active'));
-            btn.className = 'toggle-sort-btn';
-
-            if (currentSortMode === 0) {
-                btn.innerText = '↕️ 정렬 모드: OFF';
-                alert('🔒 모든 대분류 파일 및 내부 물품의 배치가 안전하게 저장되었습니다.');
-                loadInventoryStatus();
-            } 
-            else {
-                btn.innerText = '🔄 정렬 모드: ON';
-                btn.classList.add('active-mode');
-                
-                document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
-                globalFolderSortable = Sortable.create(container, {
-                    animation: 200,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    onEnd() {
-                        const sections = container.querySelectorAll('.category-section');
-                        const newFolderOrder = [];
-                        sections.forEach(sec => { newFolderOrder.push(sec.getAttribute('data-catname')); });
-                        globalCategories = newFolderOrder;
-                        localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                    }
-                });
-                
-                document.querySelectorAll('.item-card').forEach(c => c.classList.add('sort-mode-item-active'));
-                const containers = document.querySelectorAll('.items-drag-container');
-                containers.forEach(dragContainer => {
-                    const sortableInstance = Sortable.create(dragContainer, {
-                        animation: 200,
-                        ghostClass: 'sortable-ghost',
-                        chosenClass: 'sortable-chosen',
-                        async onEnd() {
-                            const cards = dragContainer.querySelectorAll('.item-card');
-                            for(let i = 0; i < cards.length; i++) {
-                                const id = cards[i].getAttribute('data-itemid');
-                                await fetch(`${BASE_URL}/items?id=eq.${id}`, {
-                                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
-                                });
-                            }
-                        }
-                    });
-                    globalItemSortables.push(sortableInstance);
-                });
-            }
-        }
-
-        window.onload = function() {
-            try {
-                const savedNotes = localStorage.getItem('system_sticky_notes');
-                if(savedNotes) {
-                    stickyNotes = JSON.parse(savedNotes);
-                } else {
-                    stickyNotes = [{ id: Date.now(), title: '💡 안내 가이드', content: '내용을 입력하면 자동 저장됩니다.', date: getFormattedDate() }];
-                    saveNotesToLocalStorage();
-                }
-
-                const savedCatOrder = localStorage.getItem('system_category_order');
-                if (savedCatOrder) {
-                    globalCategories = JSON.parse(savedCatOrder);
-                }
-
-                loadItems();
-                loadCategories();
-            } catch(e) { console.error(e); }
-            
-            window.addEventListener('click', function(e) {
-                if(!e.target.classList.contains('more-btn')) {
-                    document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
-                }
-            });
-
-            window.addEventListener('scroll', updateOpenDropdownPosition, true);
-            window.addEventListener('resize', updateOpenDropdownPosition);
-        };
-
-        function getFormattedDate() {
-            const now = new Date();
-            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        }
-        function saveNotesToLocalStorage() { localStorage.setItem('system_sticky_notes', JSON.stringify(stickyNotes)); }
-        function addNewNote() {
-            stickyNotes.unshift({ id: Date.now(), title: '', content: '', date: getFormattedDate() });
-            saveNotesToLocalStorage();
-            renderNotes();
-        }
-        function updateNote(id, field, value) {
-            const targetNote = stickyNotes.find(note => note.id === id);
-            if(targetNote) { targetNote[field] = value; saveNotesToLocalStorage(); }
-        }
-        function deleteNote(id) {
-            if(!confirm('이 스티커 메모를 삭제하시겠습니까?')) return;
-            stickyNotes = stickyNotes.filter(note => note.id !== id);
-            saveNotesToLocalStorage();
-            renderNotes();
-        }
-        function renderNotes() {
-            const listContainer = document.getElementById('notesList');
-            const keyword = document.getElementById('noteSearch').value.toLowerCase().trim();
-            if(!listContainer) return;
-            listContainer.innerHTML = '';
-            const filteredNotes = stickyNotes.filter(note => note.title.toLowerCase().includes(keyword) || note.content.toLowerCase().includes(keyword));
-            if(filteredNotes.length === 0) {
-                listContainer.innerHTML = '<div style="text-align:center; color:#888; font-size:13px; padding:20px;">일치하는 메모가 없습니다.</div>';
-                return;
-            }
-            filteredNotes.forEach(note => {
-                const card = document.createElement('div');
-                card.className = 'note-card';
-                card.innerHTML = `
-                    <div class="note-card-header">
-                        <span class="note-date">${note.date}</span>
-                        <button class="delete-note-btn" onclick="deleteNote(${note.id})">✕</button>
-                    </div>
-                    <input type="text" class="note-input-title" placeholder="제목 없음" value="${note.title}" oninput="updateNote(${note.id}, 'title', this.value)">
-                    <textarea class="note-input-content" placeholder="메모 입력..." oninput="updateNote(${note.id}, 'content', this.value)">${note.content}</textarea>
-                `;
-                listContainer.appendChild(card);
-            });
-        }
-
-        function checkNewCategory(select) {
-            const input = document.getElementById('newCategoryInput');
-            if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
-            else { input.style.display = 'none'; }
-        }
-        function normalizeCategory(cat) {
-            if(!cat || String(cat).trim() === '' || String(cat).trim() === 'null') return '미지정분류';
-            return String(cat).trim();
-        }
-        async function loadCategories() {
-            try {
-                const response = await fetch(`${BASE_URL}/items?select=category`, { headers });
-                if(!response.ok) return;
-                const data = await response.json();
-                const dbCats = Array.isArray(data) ? data.map(item => normalizeCategory(item.category)) : [];
-                
-                const uniqueCats = [...new Set(dbCats)].filter(c => c !== '기본분류');
-                
-                if (globalCategories.length === 0) {
-                    globalCategories = uniqueCats;
-                } else {
-                    uniqueCats.forEach(c => {
-                        if(!globalCategories.includes(c)) globalCategories.push(c);
-                    });
-                    globalCategories = globalCategories.filter(c => uniqueCats.includes(c));
-                }
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                
-                const select = document.getElementById('itemCategorySelect');
-                if(select) {
-                    let options = '';
-                    if(globalCategories.length === 0) {
-                        options += `<option value="">선택 가능한 분류 없음 (새 분류를 생성하세요)</option>`;
-                    } else {
-                        globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
-                    }
-                    options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
-                    select.innerHTML = options;
-                    document.getElementById('newCategoryInput').style.display = 'none';
-                }
-            } catch (e) { console.error(e); }
-        }
-
-        async function loadItems() {
-            try {
-                const response = await fetch(`${BASE_URL}/items?select=name&order=sort_order.asc`, { headers });
-                if(!response.ok) return;
-                const data = await response.json();
-                let options = '<option value="">물품을 선택하세요</option>';
-                if(Array.isArray(data)){
-                    data.forEach(item => { if(item && item.name) options += `<option value="${item.name}">${item.name}</option>`; });
-                }
-                if(document.getElementById('inItemSelect')) document.getElementById('inItemSelect').innerHTML = options;
-                if(document.getElementById('outItemSelect')) document.getElementById('outItemSelect').innerHTML = options;
-            } catch (error) { console.error(error); }
-        }
-
-        async function addItem() {
-            const select = document.getElementById('itemCategorySelect');
-            const newInput = document.getElementById('newCategoryInput');
-            let category = select.value;
-            if(category === '__NEW__') {
-                category = newInput.value.trim();
-                if(!category) return alert('새로운 분류 명칭을 입력해 주세요.');
-            }
-            if(!category) return alert('분류를 선택하거나 새로 생성해주세요.');
-            category = normalizeCategory(category);
-            const name = document.getElementById('itemName').value.trim();
-            const memo = document.getElementById('itemMemo').value.trim();
-            if(!name) return alert('물품명을 입력해주세요.');
-
-            try {
-                const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
-                const countData = await countRes.json();
-                const nextOrder = (countData ? countData.length : 0) + 1;
-
-                await fetch(`${BASE_URL}/items`, {
-                    method: 'POST', headers,
-                    body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
-                });
-                alert(`[${category} > ${name}] 등록 완료!`);
-                document.getElementById('itemName').value = '';
-                document.getElementById('itemMemo').value = '';
-                newInput.value = '';
-                loadCategories();
-            } catch (error) { alert("오류: " + error.message); }
-        }
-
-        async function logStock(type) {
-            const prefix = type === '입고' ? 'in' : 'out';
-            const itemName = document.getElementById(`${prefix}ItemSelect`).value;
-            const count = parseInt(document.getElementById(`${prefix}Count`).value);
-            const note = document.getElementById(`${prefix}Note`).value.trim();
-            if(!itemName) return alert('물품을 선택하세요.');
-            if(!count || count <= 0) return alert('정확한 수량을 입력하세요.');
-
-            try {
-                await fetch(`${BASE_URL}/stock_logs`, {
-                    method: 'POST', headers,
-                    body: JSON.stringify({ type, item_name: itemName, count, note })
-                });
-                alert(`${itemName} ${count}개 ${type} 완료!`);
-                document.getElementById(`${prefix}Count`).value = '';
-                document.getElementById(`${prefix}Note`).value = '';
-            } catch (error) { alert("처리 오류: " + error.message); }
-        }
-
-        function createNewCategoryFromStatus() {
-            const newCatName = prompt('새로 만들 분류 파일(폴더) 이름을 지정하세요:');
-            if(!newCatName || newCatName.trim() === '') return;
-            const target = normalizeCategory(newCatName);
-            if(globalCategories.includes(target)) return alert('이미 존재하는 분류 파일입니다.');
-            
-            globalCategories.push(target);
-            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-            alert(`[${target}] 분류가 추가되었습니다.`);
-            loadInventoryStatus();
-        }
-
-        function toggleMoreMenu(event) {
-            event.stopPropagation();
-            const btn = event.target;
-            const dropdown = btn.nextElementSibling;
-            const isOpen = dropdown.classList.contains('show');
-            
-            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
-            
-            if(!isOpen && dropdown) {
-                dropdown.classList.add('show');
-                btn.setAttribute('data-active-dropdown', 'true');
-                positionDropdown(btn, dropdown);
-            } else {
-                btn.removeAttribute('data-active-dropdown');
-            }
-        }
-
-        function positionDropdown(btn, dropdown) {
-            const rect = btn.getBoundingClientRect();
-            dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-            dropdown.style.left = (rect.right - dropdown.offsetWidth + window.scrollX) + 'px';
-            dropdown.style.position = 'fixed';
-        }
-
-        function updateOpenDropdownPosition() {
-            const activeBtn = document.querySelector('[data-active-dropdown="true"]');
-            if (activeBtn) {
-                const dropdown = activeBtn.nextElementSibling;
-                if (dropdown && dropdown.classList.contains('show')) {
-                    positionDropdown(activeBtn, dropdown);
-                }
-            }
-        }
-
-        async function renameItemFromServer(itemId, oldItemName, event) {
-            event.stopPropagation();
-            const newItemName = prompt(`[${oldItemName}] 물품의 새로운 이름을 입력하세요:`, oldItemName);
-            if(!newItemName || newItemName.trim() === '' || newItemName.trim() === oldItemName) return;
-            
-            const targetName = newItemName.trim();
-            try {
-                const itemPatch = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ name: targetName })
-                });
-                if(!itemPatch.ok) throw new Error('서버 물품명 변경 실패');
-
-                await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName })
-                });
-
-                alert(`물품명이 [ ${targetName} ] (으)로 변경 및 동기화되었습니다.`);
-                loadInventoryStatus();
-            } catch(e) { 
-                alert("수정 오류: " + e.message); 
-            }
-        }
-
-        async function renameCategoryFromStatus(oldCatName, event) {
-            event.stopPropagation();
-            const newCatName = prompt(`[${oldCatName}] 분류의 새 이름을 입력하세요:`, oldCatName);
-            if(!newCatName || newCatName.trim() === '' || newCatName === oldCatName) return;
-            const normalizedNew = normalizeCategory(newCatName);
-            if(globalCategories.includes(normalizedNew)) return alert('이미 존재하는 분류 이름입니다.');
-
-            try {
-                await fetch(`${BASE_URL}/items?category=eq.${oldCatName}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ category: normalizedNew })
-                });
-                globalCategories = globalCategories.map(c => c === oldCatName ? normalizedNew : c);
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                alert('변경완료');
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
-
-        async function deleteCategoryFromStatus(catName, event) {
-            event.stopPropagation();
-            if(!confirm(`[${catName}] 폴더와 하위 물품을 모두 서버에서 전면 삭제할까요?`)) return;
-            try {
-                await fetch(`${BASE_URL}/items?category=eq.${catName}`, { method: 'DELETE', headers });
-                globalCategories = globalCategories.filter(c => c !== catName);
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
-
-        function formatDateFull(isoString) {
-            if(!isoString) return "-";
-            const d = new Date(isoString);
-            if(isNaN(d.getTime())) return "-";
-            
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const date = String(d.getDate()).padStart(2, '0');
-            const h = String(d.getHours()).padStart(2, '0');
-            const m = String(d.getMinutes()).padStart(2, '0');
-            const s = String(d.getSeconds()).padStart(2, '0');
-            
-            return `${year}-${month}-${date} ${h}:${m}:${s}`;
-        }
-
-        async function loadInventoryStatus() {
-            const container = document.getElementById('itemStatusList');
-            if(!container) return;
-
-            try {
-                const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
-                if (!itemRes.ok) { container.innerHTML = `⚠️ DB 로드 실패`; return; }
-                const itemsData = await itemRes.json();
-                latestRawItems = itemsData;
-
-                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
-                globalLogsData = logRes.ok ? await logRes.json() : [];
-
-                container.innerHTML = '';
-
-                itemsData.forEach(item => { item.category = normalizeCategory(item.category); });
-                const activeDbCategories = itemsData.map(item => item.category);
-                
-                let allCategories = [...globalCategories];
-                activeDbCategories.forEach(c => { if(!allCategories.includes(c)) allCategories.push(c); });
-                allCategories = allCategories.filter(c => c && c !== '기본분류');
-
-                const groups = {};
-                allCategories.forEach(c => groups[c] = []);
-                itemsData.forEach(item => { if(groups[item.category]) groups[item.category].push(item); });
-
-                allCategories.forEach(catName => {
-                    const matchedItems = groups[catName] || [];
-                    const section = document.createElement('div');
-                    section.className = 'category-section';
-                    section.setAttribute('data-catname', catName);
-                    if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
+            # 열 종류별 정렬 및 서식 설정
+            if is_stock_table:
+                if col_idx in [1, 2]:  # 분류, 제품명
+                    cell.alignment = align_left
+                else:                  # 개수 숫자는 오른쪽 정렬 및 천단위 콤마
+                    cell.alignment = align_right
+                    cell.number_format = '#,##0'
+            else:
+                if col_idx == 1:       # 날짜
+                    cell.alignment = align_center
+                elif col_idx in [2, 3]: # 분류, 제품명
+                    cell.alignment = align_left
+                elif col_idx == 4:     # 수량
+                    cell.alignment = align_right
+                    cell.number_format = '#,##0'
+                else:                  # 비고
+                    cell.alignment = align_left
                     
-                    section.innerHTML = `
-                        <div class="category-title">
-                            <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span></div>
-                            <div class="more-menu-container">
-                                <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
-                                <div class="more-dropdown">
-                                    <button onclick="renameCategoryFromStatus('${catName}', event)">✏️ 폴더 이름 수정</button>
-                                    <button class="del-action" onclick="deleteCategoryFromStatus('${catName}', event)">🗑️ 분류 전체삭제</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="items-drag-container" style="min-height:20px;"></div>
-                    `;
+        current_row += 1
+    
+    return current_row + 2  # 다음 표를 위한 시작 행 반환 (두 줄 띄움)
 
-                    const dragContainer = section.querySelector('.items-drag-container');
+# 5. 각 표 그리기
+next_row = write_table(2, stock_title, stock_headers, stock_data, is_stock_table=True)
+next_row = write_table(next_row, receiving_title, receiving_headers, receiving_data)
+next_row = write_table(next_row, shipping_title, shipping_headers, shipping_data)
 
-                    if(matchedItems.length === 0) {
-                        dragContainer.innerHTML = `<div class="empty-notice" style="color:#bbb; font-size:13px; text-align:center; padding:10px;">이 분류 파일은 비어있습니다.</div>`;
-                    } else {
-                        matchedItems.forEach(item => {
-                            const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === item.name) : [];
-                            
-                            // 전체 기간 기준 실시간 재고 계산
-                            let totalStock = 0;
-                            itemLogs.forEach(l => {
-                                if(l.type === '입고') totalStock += (l.count || 0);
-                                if(l.type === '출고') totalStock -= (l.count || 0);
-                            });
+# 6. 열 너비 자동 조절
+for col in ws.columns:
+    max_len = 0
+    col_letter = get_column_letter(col[0].column)
+    for cell in col:
+        if cell.value:
+            # 한글 글자 깨짐 방지를 위해 인코딩 길이 고려
+            val_str = str(cell.value)
+            cell_len = len(val_str.encode('utf-8'))
+            if cell_len > max_len:
+                max_len = cell_len
+    # 제목 줄 때문에 너무 넓어지는 것 방지 (최대 너비 제한 및 최소 너비 보장)
+    ws.column_dimensions[col_letter].width = min(max(max_len // 2 + 3, 12), 25)
 
-                            const card = document.createElement('div');
-                            card.className = 'item-card';
-                            card.setAttribute('data-itemid', item.id);
-                            if(currentSortMode === 1) card.classList.add('sort-mode-item-active');
-
-                            // 초기 로드 시 현재 날짜 기준 연/월 선택기 구성 준비
-                            const now = new Date();
-                            const currentYear = now.getFullYear();
-                            const currentMonth = now.getMonth() + 1;
-
-                            card.innerHTML = `
-                                <div class="item-header" onclick="toggleHistory(this, '${item.name}')">
-                                    <div class="item-info">
-                                        <span class="item-title">${item.name}</span>
-                                        <span class="stock-badge">재고: ${totalStock}개</span>
-                                    </div>
-                                    <div class="more-menu-container">
-                                        <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
-                                        <div class="more-dropdown">
-                                            <button onclick="renameItemFromServer('${item.id}', '${item.name}', event)">✏️ 물품 이름 수정</button>
-                                            <button onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 다른 분류로 이동</button>
-                                            <button class="del-action" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">🗑️ 물품 삭제</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="history-content">
-                                    <div class="history-month-filter" onclick="event.stopPropagation();">
-                                        <label>조회 기간:</label>
-                                        <select class="filter-year" onchange="filterItemLogsByMonth('${item.name}', this)">
-                                            <option value="2026" ${currentYear===2026?'selected':''}>2026년</option>
-                                            <option value="2025" ${currentYear===2025?'selected':''}>2025년</option>
-                                            <option value="2024" ${currentYear===2024?'selected':''}>2024년</option>
-                                        </select>
-                                        <select class="filter-month" onchange="filterItemLogsByMonth('${item.name}', this)">
-                                            ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${currentMonth===m?'selected':''}>${m}월</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div class="log-rows-container"></div>
-                                </div>
-                            `;
-                            dragContainer.appendChild(card);
-                        });
-                    }
-                    container.appendChild(section);
-                });
-
-                if(currentSortMode === 1) {
-                    globalFolderSortable = Sortable.create(container, {
-                        animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
-                        onEnd() {
-                            const sections = container.querySelectorAll('.category-section');
-                            const newFolderOrder = [];
-                            sections.forEach(sec => { newFolderOrder.push(sec.getAttribute('data-catname')); });
-                            globalCategories = newFolderOrder;
-                            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                        }
-                    });
-
-                    const containers = document.querySelectorAll('.items-drag-container');
-                    containers.forEach(dragContainer => {
-                        const sortableInstance = Sortable.create(dragContainer, {
-                            animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
-                            async onEnd() {
-                                const cards = dragContainer.querySelectorAll('.item-card');
-                                for(let i = 0; i < cards.length; i++) {
-                                    const id = cards[i].getAttribute('data-itemid');
-                                    await fetch(`${BASE_URL}/items?id=eq.${id}`, {
-                                        method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
-                                    });
-                                }
-                            }
-                        });
-                        globalItemSortables.push(sortableInstance);
-                    });
-                }
-
-            } catch (error) { console.error(error); }
-        }
-
-        // 특정 제품 카드를 열었을 때 초기 필터링 적용 처리
-        function toggleHistory(headerElement, itemName) {
-            if(headerElement && headerElement.nextElementSibling && !event.target.classList.contains('more-btn')) {
-                const historyBox = headerElement.nextElementSibling;
-                historyBox.classList.toggle('show');
-                
-                if(historyBox.classList.contains('show')) {
-                    // 열릴 때 기본 설정된 연/월 박스를 기준으로 데이터 렌더링 실행
-                    const yearSelect = historyBox.querySelector('.filter-year');
-                    filterItemLogsByMonth(itemName, yearSelect);
-                }
-            }
-        }
-
-        // 연도와 월 필터 조작 시 동작하는 렌더링 함수
-        function filterItemLogsByMonth(itemName, selectElement) {
-            const historyBox = selectElement.closest('.history-content');
-            const year = historyBox.querySelector('.filter-year').value;
-            const month = String(historyBox.querySelector('.filter-month').value).padStart(2, '0');
-            const targetPrefix = `${year}-${month}`; // 예: "2026-07"
-
-            const rowsContainer = historyBox.querySelector('.log-rows-container');
-            if(!rowsContainer) return;
-
-            const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === itemName) : [];
-            const filteredLogs = itemLogs.filter(log => log.created_at && log.created_at.startsWith(targetPrefix));
-
-            let historyHtml = '';
-            if(filteredLogs.length === 0) {
-                historyHtml = `<div style="color:#999; text-align:center; padding:15px; font-size:13px;">${year}년 ${month}월의 입출고 기록이 없습니다.</div>`;
-            } else {
-                filteredLogs.forEach(log => {
-                    historyHtml += `
-                        <div class="log-row">
-                            <div>
-                                <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                <strong>${log.count}개</strong> <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
-                                ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
-                            </div>
-                            <div class="log-actions">
-                                <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}', '${log.created_at}', event)">수정</button>
-                                <button class="btn-danger" style="padding: 4px 6px; font-size: 11px;" onclick="deleteLogDetail('${log.id}', event)">삭제</button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-            rowsContainer.innerHTML = historyHtml;
-        }
-
-        async function deleteItemFromServer(itemId, itemName, event) {
-            event.stopPropagation();
-            if (!confirm(`[ ${itemName} ] 자재 물품을 정말 삭제합니까?`)) return;
-            try {
-                await fetch(`${BASE_URL}/items?id=eq.${itemId}`, { method: 'DELETE', headers });
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-        async function deleteLogDetail(logId, event) {
-            event.stopPropagation();
-            if (!confirm("단일 기록을 완전히 지울까요?")) return;
-            try {
-                await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, { method: 'DELETE', headers });
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-        async function moveItemCategory(itemId, itemName, currentCat, event) {
-            event.stopPropagation();
-            let catListTxt = globalCategories.map((c, i) => `${i + 1}. ${c}`).join('\n');
-            const choice = prompt(`[${itemName}] 물품을 보낼 대상 폴더 번호 입력:\n\n${catListTxt}`);
-            if(!choice) return;
-            const idx = parseInt(choice) - 1;
-            if(isNaN(idx) || idx < 0 || idx >= globalCategories.length) return alert('유효하지 않은 번호입니다.');
-            const targetCategory = globalCategories[idx];
-            if(targetCategory === currentCat) return;
-
-            try {
-                await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ category: targetCategory, sort_order: 999 })
-                });
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
-        async function editLogDetail(logId, currentType, currentCount, currentNote, originalCreatedAt, event) {
-            event.stopPropagation();
-            const newType = prompt("구분 입력 (입고 / 출고):", currentType);
-            if(newType !== '입고' && newType !== '출고') return alert('올바른 구분 값을 입력하세요.');
-            const newCount = parseInt(prompt("수량 입력:", currentCount));
-            if(isNaN(newCount) || newCount <= 0) return alert('올바른 수량을 입력하세요.');
-            const newNote = prompt("특이사항 입력:", currentNote);
-            try {
-                await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ 
-                        type: newType, 
-                        count: newCount, 
-                        note: newNote,
-                        created_at: originalCreatedAt
-                    })
-                });
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-
-        // 엑셀 저장 함수 (단가 제거 & 첫 번째 시트에 월초/월말 제품총개수 페이지 신설)
-        async function exportToExcel() {
-            try {
-                const targetMonth = prompt("출력할 연도와 월을 입력하세요 (예: 2026-07)\n공백으로 두면 전체 기간 데이터를 저장합니다:");
-                if(targetMonth === null) return; 
-
-                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.asc`, { headers });
-                if(!logRes.ok) return alert('엑셀 데이터 로드 실패');
-                let allLogs = await logRes.json();
-
-                let filteredLogs = [...allLogs];
-                if(targetMonth.trim() !== "") {
-                    const matchPattern = targetMonth.trim(); 
-                    filteredLogs = allLogs.filter(log => log.created_at && log.created_at.startsWith(matchPattern));
-                }
-
-                if(!filteredLogs || filteredLogs.length === 0) {
-                    return alert('해당 조건에 부합하는 입출고 내역이 없습니다.');
-                }
-
-                const itemMap = {};
-                if(Array.isArray(latestRawItems)) {
-                    latestRawItems.forEach(it => { itemMap[it.name] = normalizeCategory(it.category); });
-                }
-
-                // --- [1] 월별재고현황 데이터 산출 ---
-                let searchYear = 2026;
-                let searchMonth = 7;
-                if(targetMonth.trim() !== "") {
-                    const parts = targetMonth.trim().split('-');
-                    searchYear = parseInt(parts[0]);
-                    searchMonth = parseInt(parts[1]);
-                } else {
-                    const now = new Date();
-                    searchYear = now.getFullYear();
-                    searchMonth = now.getMonth() + 1;
-                }
-
-                const firstDayEnd = new Date(searchYear, searchMonth - 1, 1, 23, 59, 59, 999);
-                const lastDayEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
-
-                const statusRows = [
-                    [],
-                    ["", `${searchYear}년 ${searchMonth}월 제품 총 재고 현황`],
-                    [],
-                    ["", "분류", "제품명", "1일 총 개수", "마지막일 총 개수"]
-                ];
-
-                if(Array.isArray(latestRawItems)) {
-                    latestRawItems.forEach(item => {
-                        let stockAtFirstDay = 0;
-                        let stockAtLastDay = 0;
-
-                        allLogs.forEach(log => {
-                            if(log.item_name !== item.name) return;
-                            const logTime = new Date(log.created_at);
-
-                            if(logTime <= firstDayEnd) {
-                                if(log.type === '입고') stockAtFirstDay += (log.count || 0);
-                                if(log.type === '출고') stockAtFirstDay -= (log.count || 0);
-                            }
-                            if(logTime <= lastDayEnd) {
-                                if(log.type === '입고') stockAtLastDay += (log.count || 0);
-                                if(log.type === '출고') stockAtLastDay -= (log.count || 0);
-                            }
-                        });
-
-                        statusRows.push(["", normalizeCategory(item.category), item.name, stockAtFirstDay, stockAtLastDay]);
-                    });
-                }
-
-                // --- [2] 입고 / 출고 내역 빌드 ---
-                const inRows = [
-                    [],
-                    ["", "입 고 현 황"], 
-                    [],
-                    ["", "입고날짜", "분류", "제품명", "입고수량", "비고"]
-                ];
-
-                const outRows = [
-                    [],
-                    ["", "출 고 현 황"],
-                    [],
-                    ["", "출고날짜", "분류", "제품명", "출고수량", "비고"]
-                ];
-
-                filteredLogs.forEach(log => {
-                    const dt = new Date(log.created_at);
-                    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-                    const category = itemMap[log.item_name] || "기존분류";
-                    const pName = log.item_name || "";
-                    const qty = parseInt(log.count) || 0;
-                    const note = log.note || "";
-
-                    if(log.type === '입고') {
-                        inRows.push(["", dateStr, category, pName, qty, note]);
-                    } else if(log.type === '출고') {
-                        outRows.push(["", dateStr, category, pName, qty, note]);
-                    }
-                });
-
-                const wb = XLSX.utils.book_new();
-
-                const wsStatus = XLSX.utils.aoa_to_sheet(statusRows);
-                wsStatus['!cols'] = [{wch:3}, {wch:18}, {wch:25}, {wch:15}, {wch:15}];
-                XLSX.utils.book_append_sheet(wb, wsStatus, "월별재고현황");
-
-                const wsIn = XLSX.utils.aoa_to_sheet(inRows);
-                wsIn['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:30}];
-                XLSX.utils.book_append_sheet(wb, wsIn, "입고현황");
-
-                const wsOut = XLSX.utils.aoa_to_sheet(outRows);
-                wsOut['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:30}];
-                XLSX.utils.book_append_sheet(wb, wsOut, "출고현황");
-
-                const dateInfo = targetMonth.trim() !== "" ? targetMonth.trim() : "전체기간";
-                XLSX.writeFile(wb, `자재관리장부_${dateInfo}.xlsx`);
-                
-            } catch (e) {
-                alert("엑셀 저장 실패: " + e.message);
-                console.error(e);
-            }
-        }
-    </script>
-</body>
-</html>
+# 7. 파일 저장 (요청하신 파일명 반영)
+wb.save("시스템사업부 자재관리.xlsx")
+print("파일 생성 완료: 시스템사업부 자재관리.xlsx")
