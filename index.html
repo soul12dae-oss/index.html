@@ -56,6 +56,7 @@
         .log-actions { display: flex; gap: 5px; align-items: center; }
         .sm-edit-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; color: #495057; }
         .log-note { font-size: 12px; color: #6c757d; margin-top: 3px; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #e9ecef; }
+        .running-stock { font-size: 12px; color: #6c757d; font-weight: normal; margin-left: 6px; }
         
         .top-action-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
         .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
@@ -537,7 +538,7 @@
                 const itemPatch = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ name: targetName })
                 });
-                if(!itemPatch.ok) throw new Error('서ver 물품명 변경 실패');
+                if(!itemPatch.ok) throw new Error('서버 물품명 변경 실패');
 
                 await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName })
@@ -604,7 +605,7 @@
                 const itemsData = await itemRes.json();
                 latestRawItems = itemsData;
 
-                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
+                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.asc`, { headers });
                 globalLogsData = logRes.ok ? await logRes.json() : [];
 
                 container.innerHTML = '';
@@ -755,7 +756,18 @@
             if(!rowsContainer) return;
 
             const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === itemName) : [];
-            const filteredLogs = itemLogs.filter(log => log.created_at && log.created_at.startsWith(targetPrefix));
+            
+            // 실시간 잔여 재고 계산용 누적 변수 (오래된 로그 순으로 연산 수행)
+            let runningStock = 0;
+            const logsWithRunningStock = itemLogs.map(log => {
+                if(log.type === '입고') runningStock += (log.count || 0);
+                if(log.type === '출고') runningStock -= (log.count || 0);
+                return { ...log, currentStockState: runningStock };
+            });
+
+            // 화면 표시를 위해 최신 등록 순(역순)으로 정렬
+            const sortedWithStock = logsWithRunningStock.reverse();
+            const filteredLogs = sortedWithStock.filter(log => log.created_at && log.created_at.startsWith(targetPrefix));
 
             let historyHtml = '';
             if(filteredLogs.length === 0) {
@@ -766,7 +778,9 @@
                         <div class="log-row">
                             <div>
                                 <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                <strong>${log.count}개</strong> <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
+                                <strong>${log.count}개</strong> 
+                                <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
+                                <span class="running-stock">(잔여: ${log.currentStockState}EA)</span>
                                 ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
                             </div>
                             <div class="log-actions">
@@ -869,9 +883,7 @@
                     searchMonth = now.getMonth() + 1;
                 }
 
-                // 이월재고 기준: 선택한 월 1일의 00:00:00 직전 (즉, 전월 말 자정)
                 const previousMonthEnd = new Date(searchYear, searchMonth - 1, 1, 0, 0, 0, 0);
-                // 마감재고 기준: 선택한 월 마지막 날의 23:59:59.999
                 const currentMonthEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
 
                 const statusRows = [
@@ -939,7 +951,6 @@
                 const wsIn = XLSX.utils.aoa_to_sheet(inRows);
                 const wsOut = XLSX.utils.aoa_to_sheet(outRows);
 
-                // --- 맑은 고딕(Malgun Gothic) 글꼴 및 스타일 정의 ---
                 const titleStyle = {
                     fill: { patternType: "solid", fgColor: { rgb: "FFFF00" } },
                     font: { name: "맑은 고딕", bold: true, size: 14 }
@@ -957,11 +968,6 @@
                     }
                 };
 
-                const dataStyle = {
-                    font: { name: "맑은 고딕", size: 10 }
-                };
-
-                // 모든 생성된 데이터 셀에 기본 글꼴(맑은 고딕) 일괄 적용
                 function applyFontToSheet(ws) {
                     for (let cellRef in ws) {
                         if (cellRef[0] === '!') continue;
@@ -972,7 +978,6 @@
                     }
                 }
 
-                // 1. 월별재고현황 서식 주입
                 if(wsStatus["B2"]) wsStatus["B2"].s = titleStyle;
                 for(let col = 1; col <= 4; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
@@ -980,7 +985,6 @@
                 }
                 applyFontToSheet(wsStatus);
 
-                // 2. 입고현황 서식 주입
                 if(wsIn["B2"]) wsIn["B2"].s = titleStyle;
                 for(let col = 1; col <= 5; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
@@ -988,7 +992,6 @@
                 }
                 applyFontToSheet(wsIn);
 
-                // 3. 출고현황 서식 주입
                 if(wsOut["B2"]) wsOut["B2"].s = titleStyle;
                 for(let col = 1; col <= 5; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
@@ -996,7 +999,6 @@
                 }
                 applyFontToSheet(wsOut);
 
-                // 모든 열의 너비를 기존보다 훨씬 넉넉하게 확장 (E열 포함)
                 wsStatus['!cols'] = [{wch:5}, {wch:22}, {wch:30}, {wch:18}, {wch:22}];
                 XLSX.utils.book_append_sheet(wb, wsStatus, "월별재고현황");
 
