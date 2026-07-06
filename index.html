@@ -46,6 +46,12 @@
 
         .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
         .history-content.show { display: block; }
+        
+        /* 월 선택기 디자인 */
+        .history-month-filter { display: flex; gap: 8px; background: #e9ecef; padding: 8px; border-radius: 6px; margin-bottom: 10px; align-items: center; }
+        .history-month-filter select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; }
+        .history-month-filter label { font-size: 12px; font-weight: bold; color: #495057; }
+
         .log-row { padding: 10px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: center; }
         .log-row:last-child { border-bottom: none; }
         .log-actions { display: flex; gap: 5px; align-items: center; }
@@ -77,12 +83,13 @@
 
         @media print {
             body { background: white; color: black; padding: 0; }
-            .nav, .top-action-bar, p, .more-menu-container, .log-actions { display: none !important; }
+            .nav, .top-action-bar, p, .more-menu-container, .log-actions, .history-month-filter { display: none !important; }
             .tab-content { display: none !important; box-shadow: none; padding: 0; max-width: 100%; }
             #status.tab-content { display: block !important; }
             .category-section { border: 1px solid #333; background: white; page-break-inside: avoid; }
             .item-card { border: 1px solid #aaa; background: white; }
             .stock-badge { border: 1px solid #000; background: #fff; }
+            .history-content { display: block !important; }
         }
     </style>
 </head>
@@ -201,6 +208,7 @@
         let globalFolderSortable = null;
         let globalItemSortables = [];
         let latestRawItems = [];
+        let globalLogsData = []; // 필터링을 위해 로그 데이터 전역 저장
 
         function openTab(tabId) {
             try {
@@ -598,7 +606,7 @@
                 latestRawItems = itemsData;
 
                 const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
-                const logsData = logRes.ok ? await logRes.json() : [];
+                globalLogsData = logRes.ok ? await logRes.json() : [];
 
                 container.innerHTML = '';
 
@@ -640,7 +648,9 @@
                         dragContainer.innerHTML = `<div class="empty-notice" style="color:#bbb; font-size:13px; text-align:center; padding:10px;">이 분류 파일은 비어있습니다.</div>`;
                     } else {
                         matchedItems.forEach(item => {
-                            const itemLogs = Array.isArray(logsData) ? logsData.filter(log => log && log.item_name === item.name) : [];
+                            const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === item.name) : [];
+                            
+                            // 전체 기간 기준 실시간 재고 계산
                             let totalStock = 0;
                             itemLogs.forEach(l => {
                                 if(l.type === '입고') totalStock += (l.count || 0);
@@ -652,29 +662,13 @@
                             card.setAttribute('data-itemid', item.id);
                             if(currentSortMode === 1) card.classList.add('sort-mode-item-active');
 
-                            let historyHtml = '';
-                            if(itemLogs.length === 0) {
-                                historyHtml = '<div style="color:#999; text-align:center; padding:10px;">기록이 없습니다.</div>';
-                            } else {
-                                itemLogs.forEach(log => {
-                                    historyHtml += `
-                                        <div class="log-row">
-                                            <div>
-                                                <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                                <strong>${log.count}개</strong> <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
-                                                ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
-                                            </div>
-                                            <div class="log-actions">
-                                                <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}', '${log.created_at}', event)">수정</button>
-                                                <button class="btn-danger" style="padding: 4px 6px; font-size: 11px;" onclick="deleteLogDetail('${log.id}', event)">삭제</button>
-                                            </div>
-                                        </div>
-                                    `;
-                                });
-                            }
+                            // 초기 로드 시 현재 날짜 기준 연/월 선택기 구성 준비
+                            const now = new Date();
+                            const currentYear = now.getFullYear();
+                            const currentMonth = now.getMonth() + 1;
 
                             card.innerHTML = `
-                                <div class="item-header" onclick="toggleHistory(this)">
+                                <div class="item-header" onclick="toggleHistory(this, '${item.name}')">
                                     <div class="item-info">
                                         <span class="item-title">${item.name}</span>
                                         <span class="stock-badge">재고: ${totalStock}개</span>
@@ -688,7 +682,20 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="history-content">${historyHtml}</div>
+                                <div class="history-content">
+                                    <div class="history-month-filter" onclick="event.stopPropagation();">
+                                        <label>조회 기간:</label>
+                                        <select class="filter-year" onchange="filterItemLogsByMonth('${item.name}', this)">
+                                            <option value="2026" ${currentYear===2026?'selected':''}>2026년</option>
+                                            <option value="2025" ${currentYear===2025?'selected':''}>2025년</option>
+                                            <option value="2024" ${currentYear===2024?'selected':''}>2024년</option>
+                                        </select>
+                                        <select class="filter-month" onchange="filterItemLogsByMonth('${item.name}', this)">
+                                            ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${currentMonth===m?'selected':''}>${m}월</option>`).join('')}
+                                        </select>
+                                    </div>
+                                    <div class="log-rows-container"></div>
+                                </div>
                             `;
                             dragContainer.appendChild(card);
                         });
@@ -729,11 +736,56 @@
             } catch (error) { console.error(error); }
         }
 
-        function toggleHistory(headerElement) {
+        // 특정 제품 카드를 열었을 때 초기 필터링 적용 처리
+        function toggleHistory(headerElement, itemName) {
             if(headerElement && headerElement.nextElementSibling && !event.target.classList.contains('more-btn')) {
-                headerElement.nextElementSibling.classList.toggle('show');
+                const historyBox = headerElement.nextElementSibling;
+                historyBox.classList.toggle('show');
+                
+                if(historyBox.classList.contains('show')) {
+                    // 열릴 때 기본 설정된 연/월 박스를 기준으로 데이터 렌더링 실행
+                    const yearSelect = historyBox.querySelector('.filter-year');
+                    filterItemLogsByMonth(itemName, yearSelect);
+                }
             }
         }
+
+        // 연도와 월 필터 조작 시 동작하는 렌더링 함수
+        function filterItemLogsByMonth(itemName, selectElement) {
+            const historyBox = selectElement.closest('.history-content');
+            const year = historyBox.querySelector('.filter-year').value;
+            const month = String(historyBox.querySelector('.filter-month').value).padStart(2, '0');
+            const targetPrefix = `${year}-${month}`; // 예: "2026-07"
+
+            const rowsContainer = historyBox.querySelector('.log-rows-container');
+            if(!rowsContainer) return;
+
+            const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === itemName) : [];
+            const filteredLogs = itemLogs.filter(log => log.created_at && log.created_at.startsWith(targetPrefix));
+
+            let historyHtml = '';
+            if(filteredLogs.length === 0) {
+                historyHtml = `<div style="color:#999; text-align:center; padding:15px; font-size:13px;">${year}년 ${month}월의 입출고 기록이 없습니다.</div>`;
+            } else {
+                filteredLogs.forEach(log => {
+                    historyHtml += `
+                        <div class="log-row">
+                            <div>
+                                <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
+                                <strong>${log.count}개</strong> <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
+                                ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
+                            </div>
+                            <div class="log-actions">
+                                <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}', '${log.created_at}', event)">수정</button>
+                                <button class="btn-danger" style="padding: 4px 6px; font-size: 11px;" onclick="deleteLogDetail('${log.id}', event)">삭제</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            rowsContainer.innerHTML = historyHtml;
+        }
+
         async function deleteItemFromServer(itemId, itemName, event) {
             event.stopPropagation();
             if (!confirm(`[ ${itemName} ] 자재 물품을 정말 삭제합니까?`)) return;
@@ -787,7 +839,7 @@
             } catch (e) { alert(e.message); }
         }
 
-        // 월별 필터 및 탭 분리형 파일 다운로드 함수
+        // 엑셀 저장 함수 (단가 제거 & 첫 번째 시트에 월초/월말 제품총개수 페이지 신설)
         async function exportToExcel() {
             try {
                 const targetMonth = prompt("출력할 연도와 월을 입력하세요 (예: 2026-07)\n공백으로 두면 전체 기간 데이터를 저장합니다:");
@@ -795,14 +847,15 @@
 
                 const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.asc`, { headers });
                 if(!logRes.ok) return alert('엑셀 데이터 로드 실패');
-                let logsData = await logRes.json();
+                let allLogs = await logRes.json();
 
+                let filteredLogs = [...allLogs];
                 if(targetMonth.trim() !== "") {
-                    const matchPattern = targetMonth.trim(); // "YYYY-MM"
-                    logsData = logsData.filter(log => log.created_at && log.created_at.startsWith(matchPattern));
+                    const matchPattern = targetMonth.trim(); 
+                    filteredLogs = allLogs.filter(log => log.created_at && log.created_at.startsWith(matchPattern));
                 }
 
-                if(!logsData || logsData.length === 0) {
+                if(!filteredLogs || filteredLogs.length === 0) {
                     return alert('해당 조건에 부합하는 입출고 내역이 없습니다.');
                 }
 
@@ -811,22 +864,68 @@
                     latestRawItems.forEach(it => { itemMap[it.name] = normalizeCategory(it.category); });
                 }
 
-                // 이미지 디자인과 동일하게 빈 행과 디자인용 틀 구성
+                // --- [1] 월별재고현황 데이터 산출 ---
+                let searchYear = 2026;
+                let searchMonth = 7;
+                if(targetMonth.trim() !== "") {
+                    const parts = targetMonth.trim().split('-');
+                    searchYear = parseInt(parts[0]);
+                    searchMonth = parseInt(parts[1]);
+                } else {
+                    const now = new Date();
+                    searchYear = now.getFullYear();
+                    searchMonth = now.getMonth() + 1;
+                }
+
+                const firstDayEnd = new Date(searchYear, searchMonth - 1, 1, 23, 59, 59, 999);
+                const lastDayEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
+
+                const statusRows = [
+                    [],
+                    ["", `${searchYear}년 ${searchMonth}월 제품 총 재고 현황`],
+                    [],
+                    ["", "분류", "제품명", "1일 총 개수", "마지막일 총 개수"]
+                ];
+
+                if(Array.isArray(latestRawItems)) {
+                    latestRawItems.forEach(item => {
+                        let stockAtFirstDay = 0;
+                        let stockAtLastDay = 0;
+
+                        allLogs.forEach(log => {
+                            if(log.item_name !== item.name) return;
+                            const logTime = new Date(log.created_at);
+
+                            if(logTime <= firstDayEnd) {
+                                if(log.type === '입고') stockAtFirstDay += (log.count || 0);
+                                if(log.type === '출고') stockAtFirstDay -= (log.count || 0);
+                            }
+                            if(logTime <= lastDayEnd) {
+                                if(log.type === '입고') stockAtLastDay += (log.count || 0);
+                                if(log.type === '출고') stockAtLastDay -= (log.count || 0);
+                            }
+                        });
+
+                        statusRows.push(["", normalizeCategory(item.category), item.name, stockAtFirstDay, stockAtLastDay]);
+                    });
+                }
+
+                // --- [2] 입고 / 출고 내역 빌드 ---
                 const inRows = [
                     [],
                     ["", "입 고 현 황"], 
                     [],
-                    ["", "입고날짜", "분류", "제품명", "입고수량", "단가", "비고"]
+                    ["", "입고날짜", "분류", "제품명", "입고수량", "비고"]
                 ];
 
                 const outRows = [
                     [],
                     ["", "출 고 현 황"],
                     [],
-                    ["", "출고날짜", "분류", "제품명", "출고수량", "단가", "비고"]
+                    ["", "출고날짜", "분류", "제품명", "출고수량", "비고"]
                 ];
 
-                logsData.forEach(log => {
+                filteredLogs.forEach(log => {
                     const dt = new Date(log.created_at);
                     const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
                     const category = itemMap[log.item_name] || "기존분류";
@@ -835,22 +934,24 @@
                     const note = log.note || "";
 
                     if(log.type === '입고') {
-                        inRows.push(["", dateStr, category, pName, qty, "", note]);
+                        inRows.push(["", dateStr, category, pName, qty, note]);
                     } else if(log.type === '출고') {
-                        outRows.push(["", dateStr, category, pName, qty, "", note]);
+                        outRows.push(["", dateStr, category, pName, qty, note]);
                     }
                 });
 
                 const wb = XLSX.utils.book_new();
 
-                // 1. 입고 현황 시트 빌드
+                const wsStatus = XLSX.utils.aoa_to_sheet(statusRows);
+                wsStatus['!cols'] = [{wch:3}, {wch:18}, {wch:25}, {wch:15}, {wch:15}];
+                XLSX.utils.book_append_sheet(wb, wsStatus, "월별재고현황");
+
                 const wsIn = XLSX.utils.aoa_to_sheet(inRows);
-                wsIn['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:10}, {wch:30}];
+                wsIn['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:30}];
                 XLSX.utils.book_append_sheet(wb, wsIn, "입고현황");
 
-                // 2. 출고 현황 시트 빌드
                 const wsOut = XLSX.utils.aoa_to_sheet(outRows);
-                wsOut['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:10}, {wch:30}];
+                wsOut['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:30}];
                 XLSX.utils.book_append_sheet(wb, wsOut, "출고현황");
 
                 const dateInfo = targetMonth.trim() !== "" ? targetMonth.trim() : "전체기간";
