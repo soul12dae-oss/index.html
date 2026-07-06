@@ -6,6 +6,8 @@
     <title>자재 입출고 관리 시스템 Pro</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- 엑셀 다운로드 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
         .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; }
@@ -169,6 +171,7 @@
         
         <div class="top-action-bar">
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
+            <button class="print-btn" style="background: #198754;" onclick="exportToExcel()">📊 Excel 저장</button>
             <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: 닫힘</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
@@ -761,6 +764,57 @@
                 });
                 loadInventoryStatus();
             } catch (e) { alert(e.message); }
+        }
+
+        function exportToExcel() {
+            try {
+                const container = document.getElementById('itemStatusList');
+                if(!container) return alert('데이터가 없습니다.');
+
+                const sections = container.querySelectorAll('.category-section');
+                if(sections.length === 0) return alert('엑셀로 내보낼 현황 데이터가 존재하지 않습니다.');
+
+                const excelData = [
+                    ["대분류(폴더)", "물품명", "현재 재고 수량"]
+                ];
+
+                sections.forEach(section => {
+                    const catName = section.getAttribute('data-catname');
+                    const cards = section.querySelectorAll('.item-card');
+
+                    if(cards.length === 0) {
+                        excelData.push([catName, "(비어있음)", 0]);
+                    } else {
+                        cards.forEach(card => {
+                            const itemName = card.querySelector('.item-title').innerText;
+                            const stockText = card.querySelector('.stock-badge').innerText;
+                            const stockCount = parseInt(stockText.replace(/[^0-9-]/g, '')) || 0;
+
+                            excelData.push([catName, itemName, stockCount]);
+                        });
+                    }
+                });
+
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(excelData);
+
+                ws['!cols'] = [
+                    { wch: 25 }, 
+                    { wch: 30 }, 
+                    { wch: 15 }  
+                ];
+
+                XLSX.utils.book_append_sheet(wb, ws, "자재현황판");
+                
+                const today = new Date();
+                const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                
+                XLSX.writeFile(wb, `자재출고현황판_${dateStr}.xlsx`);
+                
+            } catch (e) {
+                alert("엑셀 저장 중 오류가 발생했습니다: " + e.message);
+                console.error(e);
+            }
         }
     </script>
 </body>
