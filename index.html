@@ -200,7 +200,7 @@
         let currentSortMode = 0; 
         let globalFolderSortable = null;
         let globalItemSortables = [];
-        let latestRawItems = []; // 엑셀 출력을 위한 자재 정보 캐시용
+        let latestRawItems = [];
 
         function openTab(tabId) {
             try {
@@ -572,6 +572,21 @@
             } catch(e) { alert(e.message); }
         }
 
+        function formatDateFull(isoString) {
+            if(!isoString) return "-";
+            const d = new Date(isoString);
+            if(isNaN(d.getTime())) return "-";
+            
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const date = String(d.getDate()).padStart(2, '0');
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            
+            return `${year}-${month}-${date} ${h}:${m}:${s}`;
+        }
+
         async function loadInventoryStatus() {
             const container = document.getElementById('itemStatusList');
             if(!container) return;
@@ -580,7 +595,7 @@
                 const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
                 if (!itemRes.ok) { container.innerHTML = `⚠️ DB 로드 실패`; return; }
                 const itemsData = await itemRes.json();
-                latestRawItems = itemsData; // 엑셀 출력을 위한 물품 캐시 백업
+                latestRawItems = itemsData;
 
                 const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
                 const logsData = logRes.ok ? await logRes.json() : [];
@@ -642,16 +657,15 @@
                                 historyHtml = '<div style="color:#999; text-align:center; padding:10px;">기록이 없습니다.</div>';
                             } else {
                                 itemLogs.forEach(log => {
-                                    const dt = new Date(log.created_at);
                                     historyHtml += `
                                         <div class="log-row">
                                             <div>
                                                 <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                                <strong>${log.count}개</strong> <span style="font-size:12px; color:#777;">(${dt.toLocaleDateString('ko-KR')})</span>
+                                                <strong>${log.count}개</strong> <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
                                                 ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
                                             </div>
                                             <div class="log-actions">
-                                                <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}', event)">수정</button>
+                                                <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}', '${log.created_at}', event)">수정</button>
                                                 <button class="btn-danger" style="padding: 4px 6px; font-size: 11px;" onclick="deleteLogDetail('${log.id}', event)">삭제</button>
                                             </div>
                                         </div>
@@ -753,83 +767,97 @@
                 loadInventoryStatus();
             } catch(e) { alert(e.message); }
         }
-        async function editLogDetail(logId, currentType, currentCount, currentNote, event) {
+        async function editLogDetail(logId, currentType, currentCount, currentNote, originalCreatedAt, event) {
             event.stopPropagation();
             const newType = prompt("구분 입력 (입고 / 출고):", currentType);
-            if(newType !== '입고' && newType !== '출고') return alert('틀린 구분값입니다.');
+            if(newType !== '입고' && newType !== '출고') return alert('올바른 구분 값을 입력하세요.');
             const newCount = parseInt(prompt("수량 입력:", currentCount));
-            if(isNaN(newCount) || newCount <= 0) return alert('오류 수량');
+            if(isNaN(newCount) || newCount <= 0) return alert('올바른 수량을 입력하세요.');
             const newNote = prompt("특이사항 입력:", currentNote);
             try {
                 await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ type: newType, count: newCount, note: newNote })
+                    method: 'PATCH', headers, body: JSON.stringify({ 
+                        type: newType, 
+                        count: newCount, 
+                        note: newNote,
+                        created_at: originalCreatedAt
+                    })
                 });
                 loadInventoryStatus();
             } catch (e) { alert(e.message); }
         }
 
-        // image_df5b3e.png 스타일의 입출고 대장 형태 엑셀 파일 다운로드 함수
+        // 월별 필터 및 탭 분리형 파일 다운로드 함수
         async function exportToExcel() {
             try {
-                // 서버에서 전제 입출고 기록(장부) 데이터를 실시간 최신순으로 가져옴
-                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
-                if(!logRes.ok) return alert('엑셀 데이터 로드 실패');
-                const logsData = await logRes.json();
+                const targetMonth = prompt("출력할 연도와 월을 입력하세요 (예: 2026-07)\n공백으로 두면 전체 기간 데이터를 저장합니다:");
+                if(targetMonth === null) return; 
 
-                if(!logsData || logsData.length === 0) {
-                    return alert('출력할 입출고 데이터가 없습니다.');
+                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.asc`, { headers });
+                if(!logRes.ok) return alert('엑셀 데이터 로드 실패');
+                let logsData = await logRes.json();
+
+                if(targetMonth.trim() !== "") {
+                    const matchPattern = targetMonth.trim(); // "YYYY-MM"
+                    logsData = logsData.filter(log => log.created_at && log.created_at.startsWith(matchPattern));
                 }
 
-                // 이미지와 동일한 컬럼 헤더 구성
-                const excelData = [
-                    ["날짜", "분류", "상품명", "입/출고", "수량", "비고"]
-                ];
+                if(!logsData || logsData.length === 0) {
+                    return alert('해당 조건에 부합하는 입출고 내역이 없습니다.');
+                }
 
-                // 자재 원본 매핑용 개체 생성
                 const itemMap = {};
                 if(Array.isArray(latestRawItems)) {
                     latestRawItems.forEach(it => { itemMap[it.name] = normalizeCategory(it.category); });
                 }
 
-                // 로그 데이터를 순회하며 행 추가
+                // 이미지 디자인과 동일하게 빈 행과 디자인용 틀 구성
+                const inRows = [
+                    [],
+                    ["", "입 고 현 황"], 
+                    [],
+                    ["", "입고날짜", "분류", "제품명", "입고수량", "단가", "비고"]
+                ];
+
+                const outRows = [
+                    [],
+                    ["", "출 고 현 황"],
+                    [],
+                    ["", "출고날짜", "분류", "제품명", "출고수량", "단가", "비고"]
+                ];
+
                 logsData.forEach(log => {
                     const dt = new Date(log.created_at);
-                    // 'MM월 DD일' 형식으로 포맷팅
-                    const dateStr = `${String(dt.getMonth() + 1).padStart(2, '0')}월 ${String(dt.getDate()).padStart(2, '0')}일`;
-                    
-                    // 자재에 해당하는 원본 분류 찾기 (없으면 기본값)
+                    const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
                     const category = itemMap[log.item_name] || "기존분류";
                     const pName = log.item_name || "";
-                    const ioType = log.type || "";
                     const qty = parseInt(log.count) || 0;
                     const note = log.note || "";
 
-                    excelData.push([dateStr, category, pName, ioType, qty, note]);
+                    if(log.type === '입고') {
+                        inRows.push(["", dateStr, category, pName, qty, "", note]);
+                    } else if(log.type === '출고') {
+                        outRows.push(["", dateStr, category, pName, qty, "", note]);
+                    }
                 });
 
-                // 워크북 빌드
                 const wb = XLSX.utils.book_new();
-                const ws = XLSX.utils.aoa_to_sheet(excelData);
 
-                // 간격 자동 조정
-                ws['!cols'] = [
-                    { wch: 15 }, // 날짜
-                    { wch: 18 }, // 분류
-                    { wch: 25 }, // 상품명
-                    { wch: 12 }, // 입/출고
-                    { wch: 10 }, // 수량
-                    { wch: 30 }  // 비고
-                ];
+                // 1. 입고 현황 시트 빌드
+                const wsIn = XLSX.utils.aoa_to_sheet(inRows);
+                wsIn['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:10}, {wch:30}];
+                XLSX.utils.book_append_sheet(wb, wsIn, "입고현황");
 
-                XLSX.utils.book_append_sheet(wb, ws, "입출고대장");
-                
-                const today = new Date();
-                const fileDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-                
-                XLSX.writeFile(wb, `자재입출고장부_${fileDate}.xlsx`);
+                // 2. 출고 현황 시트 빌드
+                const wsOut = XLSX.utils.aoa_to_sheet(outRows);
+                wsOut['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:10}, {wch:30}];
+                XLSX.utils.book_append_sheet(wb, wsOut, "출고현황");
+
+                const dateInfo = targetMonth.trim() !== "" ? targetMonth.trim() : "전체기간";
+                XLSX.writeFile(wb, `자재관리장부_${dateInfo}.xlsx`);
                 
             } catch (e) {
-                alert("엑셀 저장 중 오류가 발생했습니다: " + e.message);
+                alert("엑셀 저장 실패: " + e.message);
                 console.error(e);
             }
         }
