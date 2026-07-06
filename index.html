@@ -172,7 +172,7 @@
         <div class="top-action-bar">
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
             <button class="print-btn" style="background: #198754;" onclick="exportToExcel()">📊 Excel 저장</button>
-            <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: 닫힘</button>
+            <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: OFF</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
 
@@ -200,6 +200,7 @@
         let currentSortMode = 0; 
         let globalFolderSortable = null;
         let globalItemSortables = [];
+        let latestRawItems = []; // 엑셀 출력을 위한 자재 정보 캐시용
 
         function openTab(tabId) {
             try {
@@ -231,7 +232,7 @@
             const btn = document.getElementById('globalSortMasterBtn');
             if(btn) {
                 btn.className = 'toggle-sort-btn';
-                btn.innerText = '↕️ 정렬 모드: 닫힘';
+                btn.innerText = '↕️ 정렬 모드: OFF';
             }
         }
 
@@ -248,12 +249,12 @@
             btn.className = 'toggle-sort-btn';
 
             if (currentSortMode === 0) {
-                btn.innerText = '↕️ 정렬 모드: 닫힘';
+                btn.innerText = '↕️ 정렬 모드: OFF';
                 alert('🔒 모든 대분류 파일 및 내부 물품의 배치가 안전하게 저장되었습니다.');
                 loadInventoryStatus();
             } 
             else {
-                btn.innerText = '🔄 통합 편집 및 정렬 모드';
+                btn.innerText = '🔄 정렬 모드: ON';
                 btn.classList.add('active-mode');
                 
                 document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
@@ -579,6 +580,7 @@
                 const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
                 if (!itemRes.ok) { container.innerHTML = `⚠️ DB 로드 실패`; return; }
                 const itemsData = await itemRes.json();
+                latestRawItems = itemsData; // 엑셀 출력을 위한 물품 캐시 백업
 
                 const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
                 const logsData = logRes.ok ? await logRes.json() : [];
@@ -766,50 +768,65 @@
             } catch (e) { alert(e.message); }
         }
 
-        function exportToExcel() {
+        // image_df5b3e.png 스타일의 입출고 대장 형태 엑셀 파일 다운로드 함수
+        async function exportToExcel() {
             try {
-                const container = document.getElementById('itemStatusList');
-                if(!container) return alert('데이터가 없습니다.');
+                // 서버에서 전제 입출고 기록(장부) 데이터를 실시간 최신순으로 가져옴
+                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.desc`, { headers });
+                if(!logRes.ok) return alert('엑셀 데이터 로드 실패');
+                const logsData = await logRes.json();
 
-                const sections = container.querySelectorAll('.category-section');
-                if(sections.length === 0) return alert('엑셀로 내보낼 현황 데이터가 존재하지 않습니다.');
+                if(!logsData || logsData.length === 0) {
+                    return alert('출력할 입출고 데이터가 없습니다.');
+                }
 
+                // 이미지와 동일한 컬럼 헤더 구성
                 const excelData = [
-                    ["대분류(폴더)", "물품명", "현재 재고 수량"]
+                    ["날짜", "분류", "상품명", "입/출고", "수량", "비고"]
                 ];
 
-                sections.forEach(section => {
-                    const catName = section.getAttribute('data-catname');
-                    const cards = section.querySelectorAll('.item-card');
+                // 자재 원본 매핑용 개체 생성
+                const itemMap = {};
+                if(Array.isArray(latestRawItems)) {
+                    latestRawItems.forEach(it => { itemMap[it.name] = normalizeCategory(it.category); });
+                }
 
-                    if(cards.length === 0) {
-                        excelData.push([catName, "(비어있음)", 0]);
-                    } else {
-                        cards.forEach(card => {
-                            const itemName = card.querySelector('.item-title').innerText;
-                            const stockText = card.querySelector('.stock-badge').innerText;
-                            const stockCount = parseInt(stockText.replace(/[^0-9-]/g, '')) || 0;
+                // 로그 데이터를 순회하며 행 추가
+                logsData.forEach(log => {
+                    const dt = new Date(log.created_at);
+                    // 'MM월 DD일' 형식으로 포맷팅
+                    const dateStr = `${String(dt.getMonth() + 1).padStart(2, '0')}월 ${String(dt.getDate()).padStart(2, '0')}일`;
+                    
+                    // 자재에 해당하는 원본 분류 찾기 (없으면 기본값)
+                    const category = itemMap[log.item_name] || "기존분류";
+                    const pName = log.item_name || "";
+                    const ioType = log.type || "";
+                    const qty = parseInt(log.count) || 0;
+                    const note = log.note || "";
 
-                            excelData.push([catName, itemName, stockCount]);
-                        });
-                    }
+                    excelData.push([dateStr, category, pName, ioType, qty, note]);
                 });
 
+                // 워크북 빌드
                 const wb = XLSX.utils.book_new();
                 const ws = XLSX.utils.aoa_to_sheet(excelData);
 
+                // 간격 자동 조정
                 ws['!cols'] = [
-                    { wch: 25 }, 
-                    { wch: 30 }, 
-                    { wch: 15 }  
+                    { wch: 15 }, // 날짜
+                    { wch: 18 }, // 분류
+                    { wch: 25 }, // 상품명
+                    { wch: 12 }, // 입/출고
+                    { wch: 10 }, // 수량
+                    { wch: 30 }  // 비고
                 ];
 
-                XLSX.utils.book_append_sheet(wb, ws, "자재현황판");
+                XLSX.utils.book_append_sheet(wb, ws, "입출고대장");
                 
                 const today = new Date();
-                const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                const fileDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                 
-                XLSX.writeFile(wb, `자재출고현황판_${dateStr}.xlsx`);
+                XLSX.writeFile(wb, `자재입출고장부_${fileDate}.xlsx`);
                 
             } catch (e) {
                 alert("엑셀 저장 중 오류가 발생했습니다: " + e.message);
