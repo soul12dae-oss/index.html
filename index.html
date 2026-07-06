@@ -6,7 +6,7 @@
     <title>자재 입출고 관리 시스템 Pro</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
-    <!-- 엑셀 다운로드 및 스타일 지원 라이브러리 교체 -->
+    <!-- 엑셀 다운로드 및 스타일 지원 라이브러리 -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
@@ -47,7 +47,6 @@
         .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
         .history-content.show { display: block; }
         
-        /* 월 선택기 디자인 */
         .history-month-filter { display: flex; gap: 8px; background: #e9ecef; padding: 8px; border-radius: 6px; margin-bottom: 10px; align-items: center; }
         .history-month-filter select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; }
         .history-month-filter label { font-size: 12px; font-weight: bold; color: #495057; }
@@ -538,7 +537,7 @@
                 const itemPatch = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ name: targetName })
                 });
-                if(!itemPatch.ok) throw new Error('서버 물품명 변경 실패');
+                if(!itemPatch.ok) throw new Error('서ver 물품명 변경 실패');
 
                 await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName })
@@ -870,36 +869,38 @@
                     searchMonth = now.getMonth() + 1;
                 }
 
-                const firstDayEnd = new Date(searchYear, searchMonth - 1, 1, 23, 59, 59, 999);
-                const lastDayEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
+                // 이월재고 기준: 선택한 월 1일의 00:00:00 직전 (즉, 전월 말 자정)
+                const previousMonthEnd = new Date(searchYear, searchMonth - 1, 1, 0, 0, 0, 0);
+                // 마감재고 기준: 선택한 월 마지막 날의 23:59:59.999
+                const currentMonthEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
 
                 const statusRows = [
                     [],
                     ["", `${searchYear}년 ${searchMonth}월 제품 총 재고 현황`],
                     [],
-                    ["", "분류", "제품명", "1일 총 개수", "마지막일 총 개수"]
+                    ["", "분류", "제품명", "이월 재고", "당월 마감 재고"]
                 ];
 
                 if(Array.isArray(latestRawItems)) {
                     latestRawItems.forEach(item => {
-                        let stockAtFirstDay = 0;
-                        let stockAtLastDay = 0;
+                        let stockAtPrevEnd = 0;
+                        let stockAtCurrentEnd = 0;
 
                         allLogs.forEach(log => {
                             if(log.item_name !== item.name) return;
                             const logTime = new Date(log.created_at);
 
-                            if(logTime <= firstDayEnd) {
-                                if(log.type === '입고') stockAtFirstDay += (log.count || 0);
-                                if(log.type === '출고') stockAtFirstDay -= (log.count || 0);
+                            if(logTime < previousMonthEnd) {
+                                if(log.type === '입고') stockAtPrevEnd += (log.count || 0);
+                                if(log.type === '출고') stockAtPrevEnd -= (log.count || 0);
                             }
-                            if(logTime <= lastDayEnd) {
-                                if(log.type === '입고') stockAtLastDay += (log.count || 0);
-                                if(log.type === '출고') stockAtLastDay -= (log.count || 0);
+                            if(logTime <= currentMonthEnd) {
+                                if(log.type === '입고') stockAtCurrentEnd += (log.count || 0);
+                                if(log.type === '출고') stockAtCurrentEnd -= (log.count || 0);
                             }
                         });
 
-                        statusRows.push(["", normalizeCategory(item.category), item.name, stockAtFirstDay, stockAtLastDay]);
+                        statusRows.push(["", normalizeCategory(item.category), item.name, stockAtPrevEnd, stockAtCurrentEnd]);
                     });
                 }
 
@@ -938,15 +939,15 @@
                 const wsIn = XLSX.utils.aoa_to_sheet(inRows);
                 const wsOut = XLSX.utils.aoa_to_sheet(outRows);
 
-                // --- xlsx-js-style 전용 셀 서식 스타일 데이터 매핑 ---
+                // --- 맑은 고딕(Malgun Gothic) 글꼴 및 스타일 정의 ---
                 const titleStyle = {
                     fill: { patternType: "solid", fgColor: { rgb: "FFFF00" } },
-                    font: { bold: true, size: 14 }
+                    font: { name: "맑은 고딕", bold: true, size: 14 }
                 };
 
                 const headerStyle = {
                     fill: { patternType: "solid", fgColor: { rgb: "D9D9D9" } },
-                    font: { bold: true, size: 11 },
+                    font: { name: "맑은 고딕", bold: true, size: 11 },
                     alignment: { horizontal: "center", vertical: "center" },
                     border: {
                         top: { style: "thin", color: { rgb: "000000" } },
@@ -956,12 +957,28 @@
                     }
                 };
 
+                const dataStyle = {
+                    font: { name: "맑은 고딕", size: 10 }
+                };
+
+                // 모든 생성된 데이터 셀에 기본 글꼴(맑은 고딕) 일괄 적용
+                function applyFontToSheet(ws) {
+                    for (let cellRef in ws) {
+                        if (cellRef[0] === '!') continue;
+                        if (!ws[cellRef].s) {
+                            ws[cellRef].s = {};
+                        }
+                        ws[cellRef].s.font = Object.assign({ name: "맑은 고딕" }, ws[cellRef].s.font || {});
+                    }
+                }
+
                 // 1. 월별재고현황 서식 주입
                 if(wsStatus["B2"]) wsStatus["B2"].s = titleStyle;
                 for(let col = 1; col <= 4; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsStatus[cellRef]) wsStatus[cellRef].s = headerStyle;
                 }
+                applyFontToSheet(wsStatus);
 
                 // 2. 입고현황 서식 주입
                 if(wsIn["B2"]) wsIn["B2"].s = titleStyle;
@@ -969,6 +986,7 @@
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsIn[cellRef]) wsIn[cellRef].s = headerStyle;
                 }
+                applyFontToSheet(wsIn);
 
                 // 3. 출고현황 서식 주입
                 if(wsOut["B2"]) wsOut["B2"].s = titleStyle;
@@ -976,14 +994,16 @@
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsOut[cellRef]) wsOut[cellRef].s = headerStyle;
                 }
+                applyFontToSheet(wsOut);
 
-                wsStatus['!cols'] = [{wch:3}, {wch:18}, {wch:25}, {wch:15}, {wch:15}];
+                // 모든 열의 너비를 기존보다 훨씬 넉넉하게 확장 (E열 포함)
+                wsStatus['!cols'] = [{wch:5}, {wch:22}, {wch:30}, {wch:18}, {wch:22}];
                 XLSX.utils.book_append_sheet(wb, wsStatus, "월별재고현황");
 
-                wsIn['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:30}];
+                wsIn['!cols'] = [{wch:5}, {wch:18}, {wch:22}, {wch:30}, {wch:15}, {wch:35}];
                 XLSX.utils.book_append_sheet(wb, wsIn, "입고현황");
 
-                wsOut['!cols'] = [{wch:3}, {wch:15}, {wch:18}, {wch:25}, {wch:12}, {wch:30}];
+                wsOut['!cols'] = [{wch:5}, {wch:18}, {wch:22}, {wch:30}, {wch:15}, {wch:35}];
                 XLSX.utils.book_append_sheet(wb, wsOut, "출고현황");
 
                 const dateInfo = targetMonth.trim() !== "" ? targetMonth.trim() : "전체기간";
