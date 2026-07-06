@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>자재 입출고 관리 시스템 Pro</title>
-    <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
@@ -59,11 +58,10 @@
         .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
         .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
         
-        /* 상단 정렬 전용 스위치 버튼 디자인 */
-        .toggle-sort-btn { background: #fff; color: #0d6efd; border: 2px solid #0d6efd; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; transition: all 0.2s; }
-        .toggle-sort-btn.active-mode { background: #0d6efd; color: #fff; }
-        .toggle-sort-btn.item-mode-color { color: #ff9800; border-color: #ff9800; }
-        .toggle-sort-btn.item-mode-color.active-mode { background: #ff9800; color: #fff; }
+        /* 통합 정렬 마스터 스위치 디자인 */
+        .toggle-sort-btn { background: #fff; color: #495057; border: 2px solid #ced4da; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; transition: all 0.2s; }
+        .toggle-sort-btn.folder-mode { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+        .toggle-sort-btn.item-mode { background: #ff9800; color: #fff; border-color: #ff9800; }
 
         /* 메모장 전용 스타일 */
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
@@ -103,14 +101,12 @@
         <button id="btn-status" onclick="openTab('status')">전체현황</button>
     </div>
 
-    <!-- 1. 메인 화면 -->
     <div id="main" class="tab-content active">
         <h2>물품 등록</h2>
         <div class="form-group">
             <label>분류 (파일/폴더 선택 및 생성)</label>
             <select id="itemCategorySelect" onchange="checkNewCategory(this)">
-                <!-- 자바스크립트동적생성 -->
-            </select>
+                </select>
             <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류(파일) 이름을 입력하세요">
         </div>
         <div class="form-group">
@@ -124,7 +120,6 @@
         <button class="btn" onclick="addItem()">물품 등록하기</button>
     </div>
 
-    <!-- 2. 스티커 메모장 화면 -->
     <div id="notepad" class="tab-content">
         <div class="notepad-container">
             <div class="notepad-header">
@@ -137,7 +132,6 @@
         </div>
     </div>
 
-    <!-- 3. 입고 화면 -->
     <div id="inflow" class="tab-content">
         <h2>자재 입고</h2>
         <div class="form-group">
@@ -155,7 +149,6 @@
         <button class="btn" onclick="logStock('입고')">입고 완료</button>
     </div>
 
-    <!-- 4. 출고 화면 -->
     <div id="outflow" class="tab-content">
         <h2>자재 출고</h2>
         <div class="form-group">
@@ -173,20 +166,17 @@
         <button class="btn btn-danger" style="width:100%; padding:14px; font-size:16px;" onclick="logStock('출고')">출고 완료</button>
     </div>
 
-    <!-- 5. 전체 현황 화면 -->
     <div id="status" class="tab-content">
         <h2>전체 현황판</h2>
         
         <div class="top-action-bar">
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
-            <!-- [개선] 인쇄 버튼 옆으로 완벽 이동 배치된 정렬 마스터 스위치 컨트롤러 -->
-            <button id="masterFolderSortBtn" class="toggle-sort-btn" onclick="toggleMasterFolderSort()">↕️ 파일(폴더) 정렬 모드</button>
-            <button id="masterItemSortBtn" class="toggle-sort-btn item-mode-color" onclick="toggleMasterItemSort()">↕️ 내부 물품 정렬 모드</button>
+            <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: 닫힘</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
 
         <p style="font-size:12px; color:#6c757d; margin-top:-5px;">
-            * 상단 정렬 모드 버튼을 누르면 해당 카드 전체를 마우스로 자유롭게 배치 이동시킬 수 있습니다.
+            * 정렬 모드 버튼을 누르면 [파일 정렬] ➔ [물품 정렬] 순서로 변경되며 화면을 자유롭게 배치할 수 있습니다.
         </p>
         
         <div id="itemStatusList">데이터를 불러오는 중...</div>
@@ -206,11 +196,10 @@
         let globalCategories = [];
         let stickyNotes = [];
         
-        // 정렬 인스턴스 보관 플래그
+        // 정렬 상태 관련 변수 (0: 일반, 1: 폴더정렬, 2: 물품정렬)
+        let currentSortMode = 0; 
         let globalFolderSortable = null;
         let globalItemSortables = [];
-        let isFolderSortModeActive = false;
-        let isItemSortModeActive = false;
 
         function openTab(tabId) {
             try {
@@ -237,13 +226,82 @@
             if(globalFolderSortable) { globalFolderSortable.destroy(); globalFolderSortable = null; }
             globalItemSortables.forEach(s => { if(s) s.destroy(); });
             globalItemSortables = [];
-            isFolderSortModeActive = false;
-            isItemSortModeActive = false;
             
-            const fBtn = document.getElementById('masterFolderSortBtn');
-            const iBtn = document.getElementById('masterItemSortBtn');
-            if(fBtn) fBtn.classList.remove('active-mode');
-            if(iBtn) iBtn.classList.remove('active-mode');
+            currentSortMode = 0;
+            
+            const btn = document.getElementById('globalSortMasterBtn');
+            if(btn) {
+                btn.className = 'toggle-sort-btn';
+                btn.innerText = '↕️ 정렬 모드: 닫힘';
+            }
+        }
+
+        /* [개선] 하나의 버튼으로 상태를 순환시키는 함수 */
+        function rotateSortMode() {
+            currentSortMode = (currentSortMode + 1) % 3;
+            const btn = document.getElementById('globalSortMasterBtn');
+            const container = document.getElementById('itemStatusList');
+            
+            // 모든 스타일 클래스 초기화 및 인스턴스 파괴
+            if(globalFolderSortable) { globalFolderSortable.destroy(); globalFolderSortable = null; }
+            globalItemSortables.forEach(s => { if(s) s.destroy(); });
+            globalItemSortables = [];
+            document.querySelectorAll('.category-section').forEach(s => s.classList.remove('sort-mode-folder-active'));
+            document.querySelectorAll('.item-card').forEach(c => c.classList.remove('sort-mode-item-active'));
+            btn.className = 'toggle-sort-btn';
+
+            if (currentSortMode === 0) {
+                // 일반 모드로 복귀 시 데이터 새로고침
+                btn.innerText = '↕️ 정렬 모드: 닫힘';
+                alert('🔒 모든 배치가 안전하게 저장 및 고정되었습니다.');
+                loadInventoryStatus();
+            } 
+            else if (currentSortMode === 1) {
+                // 대분류 파일(폴더) 정렬 모드 활성화
+                btn.innerText = '📁 정렬 중: 파일(폴더)';
+                btn.classList.add('folder-mode');
+                
+                document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
+                
+                globalFolderSortable = Sortable.create(container, {
+                    animation: 200,
+                    ghostClass: 'sortable-ghost',
+                    chosenClass: 'sortable-chosen',
+                    onEnd() {
+                        const sections = container.querySelectorAll('.category-section');
+                        const newFolderOrder = [];
+                        sections.forEach(sec => { newFolderOrder.push(sec.getAttribute('data-catname')); });
+                        globalCategories = newFolderOrder;
+                        localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
+                    }
+                });
+            } 
+            else if (currentSortMode === 2) {
+                // 내부 물품 정렬 모드 활성화
+                btn.innerText = '📦 정렬 중: 내부 물품';
+                btn.classList.add('item-mode');
+                
+                document.querySelectorAll('.item-card').forEach(c => c.classList.add('sort-mode-item-active'));
+                
+                const containers = document.querySelectorAll('.items-drag-container');
+                containers.forEach(dragContainer => {
+                    const sortableInstance = Sortable.create(dragContainer, {
+                        animation: 200,
+                        ghostClass: 'sortable-ghost',
+                        chosenClass: 'sortable-chosen',
+                        async onEnd() {
+                            const cards = dragContainer.querySelectorAll('.item-card');
+                            for(let i = 0; i < cards.length; i++) {
+                                const id = cards[i].getAttribute('data-itemid');
+                                await fetch(`${BASE_URL}/items?id=eq.${id}`, {
+                                    method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
+                                });
+                            }
+                        }
+                    });
+                    globalItemSortables.push(sortableInstance);
+                });
+            }
         }
 
         window.onload = function() {
@@ -476,85 +534,6 @@
             }
         }
 
-        /* --- [개선] 인쇄버튼 옆 상단 마스터 대분류 폴더 전체 이동 토글 로직 --- */
-        function toggleMasterFolderSort() {
-            const btn = document.getElementById('masterFolderSortBtn');
-            const container = document.getElementById('itemStatusList');
-
-            if (isFolderSortModeActive) {
-                resetSortModes();
-                alert('🔒 모든 분류 파일(폴더) 정렬 배치가 저장 완료되었습니다.');
-                loadInventoryStatus();
-                return;
-            }
-
-            // 상반된 다른 정렬모드 끄기
-            resetSortModes();
-
-            isFolderSortModeActive = true;
-            btn.classList.add('active-mode');
-
-            document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
-
-            globalFolderSortable = Sortable.create(container, {
-                animation: 200,
-                ghostClass: 'sortable-ghost',
-                chosenClass: 'sortable-chosen',
-                onEnd() {
-                    const sections = container.querySelectorAll('.category-section');
-                    const newFolderOrder = [];
-                    sections.forEach(sec => {
-                        newFolderOrder.push(sec.getAttribute('data-catname'));
-                    });
-                    globalCategories = newFolderOrder;
-                    localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                }
-            });
-
-            alert('📁 [파일(폴더) 정렬 모드]가 활성화되었습니다!\n이제 파란색 점선 칸 아무 곳이나 마우스로 잡고 끌어당겨 정렬하세요.\n완료되면 상단의 버튼을 다시 눌러 고정시키세요.');
-        }
-
-        /* --- [개선] 인쇄버튼 옆 상단 마스터 내부 물품 전체 자료 이동 토글 로직 --- */
-        function toggleMasterItemSort() {
-            const btn = document.getElementById('masterItemSortBtn');
-
-            if (isItemSortModeActive) {
-                resetSortModes();
-                alert('🔒 모든 내부 물품의 배치가 안전하게 업데이트 및 정렬 저장되었습니다.');
-                loadInventoryStatus();
-                return;
-            }
-
-            resetSortModes();
-
-            isItemSortModeActive = true;
-            btn.classList.add('active-mode');
-
-            document.querySelectorAll('.item-card').forEach(c => c.classList.add('sort-mode-item-active'));
-
-            const containers = document.querySelectorAll('.items-drag-container');
-            containers.forEach(dragContainer => {
-                const sortableInstance = Sortable.create(dragContainer, {
-                    animation: 200,
-                    ghostClass: 'sortable-ghost',
-                    chosenClass: 'sortable-chosen',
-                    async onEnd() {
-                        const cards = dragContainer.querySelectorAll('.item-card');
-                        for(let i = 0; i < cards.length; i++) {
-                            const id = cards[i].getAttribute('data-itemid');
-                            await fetch(`${BASE_URL}/items?id=eq.${id}`, {
-                                method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
-                            });
-                        }
-                    }
-                });
-                globalItemSortables.push(sortableInstance);
-            });
-
-            alert('📦 [내부 물품 자료 정렬 모드]가 활성화되었습니다!\n이제 노란색 점선 칸 아무 곳이나 마우스로 자유롭게 잡고 드래그하세요.\n완료되면 상단의 버튼을 다시 눌러 모드를 끄세요.');
-        }
-
-        /* --- [개선] 요구사항: 물품 자체 이름 수정 함수 추가 --- */
         async function renameItemFromServer(itemId, oldItemName, event) {
             event.stopPropagation();
             const newItemName = prompt(`[${oldItemName}] 물품의 새로운 이름을 입력하세요:`, oldItemName);
@@ -562,14 +541,11 @@
             
             const targetName = newItemName.trim();
             try {
-                // 1. 물품 기본 정보 테이블 업데이트
                 const itemPatch = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ name: targetName })
                 });
-
                 if(!itemPatch.ok) throw new Error('서버 물품명 변경 실패');
 
-                // 2. 기존 입출고 기록들의 연동 물품명 명칭 일괄 동기화 업데이트
                 await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName })
                 });
@@ -641,7 +617,7 @@
                     const section = document.createElement('div');
                     section.className = 'category-section';
                     section.setAttribute('data-catname', catName);
-                    if(isFolderSortModeActive) section.classList.add('sort-mode-folder-active');
+                    if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
                     section.innerHTML = `
                         <div class="category-title">
@@ -673,7 +649,7 @@
                             const card = document.createElement('div');
                             card.className = 'item-card';
                             card.setAttribute('data-itemid', item.id);
-                            if(isItemSortModeActive) card.classList.add('sort-mode-item-active');
+                            if(currentSortMode === 2) card.classList.add('sort-mode-item-active');
 
                             let historyHtml = '';
                             if(itemLogs.length === 0) {
@@ -706,7 +682,6 @@
                                     <div class="more-menu-container">
                                         <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                         <div class="more-dropdown">
-                                            <!-- [개선/추가] 개별 조작 패널 정리 및 이름 수정 버튼 구현 배치 -->
                                             <button onclick="renameItemFromServer('${item.id}', '${item.name}', event)">✏️ 물품 이름 수정</button>
                                             <button onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 다른 분류로 이동</button>
                                             <button class="del-action" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">🗑️ 물품 삭제</button>
@@ -721,8 +696,8 @@
                     container.appendChild(section);
                 });
 
-                // 만약 활성화 상태에서 렌더링이 호출되면 바인딩 상태 복구 연산
-                if(isFolderSortModeActive) {
+                // 렌더링 호출 시 정렬 바인딩 상태 복구
+                if(currentSortMode === 1) {
                     globalFolderSortable = Sortable.create(container, {
                         animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
                         onEnd() {
@@ -734,7 +709,7 @@
                         }
                     });
                 }
-                if(isItemSortModeActive) {
+                if(currentSortMode === 2) {
                     const containers = document.querySelectorAll('.items-drag-container');
                     containers.forEach(dragContainer => {
                         const sortableInstance = Sortable.create(dragContainer, {
