@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>자재 입출고 관리 시스템 Pro</title>
+    <title>자재 입출고 관리 시스템 Pro (이카운트 연동 버전)</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <!-- 엑셀 다운로드 및 스타일 지원 라이브러리 -->
@@ -57,7 +57,6 @@
         .sm-edit-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; color: #495057; }
         .log-note { font-size: 12px; color: #6c757d; margin-top: 3px; background: #fff; padding: 3px 6px; border-radius: 4px; border: 1px solid #e9ecef; }
         
-        /* [요청 반영] 시간 옆 잔여 개수 스타일링 */
         .running-stock { font-size: 12px; color: #6c757d; font-weight: normal; margin-left: 6px; }
         
         .top-action-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
@@ -114,12 +113,16 @@
             <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류(파일) 이름을 입력하세요">
         </div>
         <div class="form-group">
-            <label>물품명</label>
-            <input type="text" id="itemName" placeholder="예: A형 볼트">
+            <label>품명 (물품명)</label>
+            <input type="text" id="itemName" placeholder="예: 최대수요전력제어기4">
+        </div>
+        <div class="form-group">
+            <label>규격</label>
+            <input type="text" id="itemSpec" placeholder="예: KCD-4">
         </div>
         <div class="form-group">
             <label>기타 메모</label>
-            <input type="text" id="itemMemo" placeholder="규격, 제조사 등">
+            <input type="text" id="itemMemo" placeholder="제조사, 단위 등 기타 사항">
         </div>
         <button class="btn" onclick="addItem()">물품 등록하기</button>
     </div>
@@ -178,7 +181,7 @@
         <h2>전체 현황판</h2>
         <div class="top-action-bar">
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
-            <button class="print-btn" style="background: #198754;" onclick="exportToExcel()">📊 Excel 저장</button>
+            <button class="print-btn" style="background: #198754;" onclick="exportToExcel()">📊 이카운트 Excel 저장</button>
             <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: OFF</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
@@ -413,12 +416,18 @@
 
         async function loadItems() {
             try {
-                const response = await fetch(`${BASE_URL}/items?select=name&order=sort_order.asc`, { headers });
+                const response = await fetch(`${BASE_URL}/items?select=name,memo&order=sort_order.asc`, { headers });
                 if(!response.ok) return;
                 const data = await response.json();
                 let options = '<option value="">물품을 선택하세요</option>';
                 if(Array.isArray(data)){
-                    data.forEach(item => { if(item && item.name) options += `<option value="${item.name}">${item.name}</option>`; });
+                    data.forEach(item => { 
+                        if(item && item.name) {
+                            // 화면에 표시할 때는 품명과 규격을 조합해서 직관적으로 식별할 수 있도록 합니다.
+                            const displayTxt = item.memo ? `${item.name} (${item.memo})` : item.name;
+                            options += `<option value="${item.name}">${displayTxt}</option>`; 
+                        }
+                    });
                 }
                 if(document.getElementById('inItemSelect')) document.getElementById('inItemSelect').innerHTML = options;
                 if(document.getElementById('outItemSelect')) document.getElementById('outItemSelect').innerHTML = options;
@@ -435,10 +444,14 @@
             }
             if(!category) return alert('분류를 선택하거나 새로 생성해주세요.');
             category = normalizeCategory(category);
+            
             const name = document.getElementById('itemName').value.trim();
+            const spec = document.getElementById('itemSpec').value.trim();
             const memo = document.getElementById('itemMemo').value.trim();
-            if(!name) return alert('물품명을 입력해주세요.');
+            
+            if(!name) return alert('품명을 입력해주세요.');
 
+            // [핵심 매칭 설계] 이카운트 엑셀 구조와 연동되도록 memo 필드에 규격을 핵심으로 저장하거나 혼합 관리할 수 있도록 구조화
             try {
                 const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
                 const countData = await countRes.json();
@@ -446,10 +459,16 @@
 
                 await fetch(`${BASE_URL}/items`, {
                     method: 'POST', headers,
-                    body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
+                    body: JSON.stringify({ 
+                        name: name, 
+                        memo: spec ? spec : memo, // 규격 값이 있으면 우선적으로 memo 컬럼에 할당해 엑셀 매칭 활용
+                        category: category, 
+                        sort_order: nextOrder 
+                    })
                 });
                 alert(`[${category} > ${name}] 등록 완료!`);
                 document.getElementById('itemName').value = '';
+                document.getElementById('itemSpec').value = '';
                 document.getElementById('itemMemo').value = '';
                 newInput.value = '';
                 loadCategories();
@@ -619,6 +638,7 @@
                     section.setAttribute('data-catname', catName);
                     if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
+                    // 화면 카드 헤더 구조 렌더링
                     section.innerHTML = `
                         <div class="category-title">
                             <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span></div>
@@ -656,10 +676,13 @@
                             const currentYear = now.getFullYear();
                             const currentMonth = now.getMonth() + 1;
 
+                            // 규격 정보가 존재하면 타이틀 옆에 같이 바인딩
+                            const displayTitle = item.memo ? `${item.name} [${item.memo}]` : item.name;
+
                             card.innerHTML = `
                                 <div class="item-header" onclick="toggleHistory(this, '${item.name}')">
                                     <div class="item-info">
-                                        <span class="item-title">${item.name}</span>
+                                        <span class="item-title">${displayTitle}</span>
                                         <span class="stock-badge">재고: ${totalStock}개</span>
                                     </div>
                                     <div class="more-menu-container">
@@ -737,7 +760,6 @@
             }
         }
 
-        /* [핵심 연산 로직] 과거부터 차례대로 연산한 실시간 스냅샷 잔여 재고 적용 */
         function filterItemLogsByMonth(itemName, selectElement) {
             const historyBox = selectElement.closest('.history-content');
             const year = historyBox.querySelector('.filter-year').value;
@@ -837,6 +859,7 @@
             } catch (e) { alert(e.message); }
         }
 
+        // [핵심 이카운트 연동 로직] 엑셀 저장 시 품명과 규격을 완전 분할하여 다운로드하는 로직으로 전면 업그레이드
         async function exportToExcel() {
             try {
                 const targetMonth = prompt("출력할 연도와 월을 입력하세요 (예: 2026-07)\n공백으로 두면 전체 기간 데이터를 저장합니다:");
@@ -858,7 +881,7 @@
 
                 const itemMap = {};
                 if(Array.isArray(latestRawItems)) {
-                    latestRawItems.forEach(it => { itemMap[it.name] = normalizeCategory(it.category); });
+                    latestRawItems.forEach(it => { itemMap[it.name] = { cat: normalizeCategory(it.category), spec: it.memo || "" }; });
                 }
 
                 let searchYear = 2026;
@@ -876,11 +899,12 @@
                 const previousMonthEnd = new Date(searchYear, searchMonth - 1, 1, 0, 0, 0, 0);
                 const currentMonthEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
 
+                // [새 이카운트 맞춤 헤더 설정] 품명과 규격을 나란히 배치하는 구조 설계
                 const statusRows = [
                     [],
-                    ["", `${searchYear}년 ${searchMonth}월 제품 총 재고 현황`],
+                    ["", `${searchYear}년 ${searchMonth}월 제품 총 재고 현황 (이카운트 규격 매칭)`],
                     [],
-                    ["", "분류", "제품명", "이월 재고", "당월 마감 재고"]
+                    ["", "분류", "품 명", "규 격", "이월 재고", "당월 마감 재고"]
                 ];
 
                 if(Array.isArray(latestRawItems)) {
@@ -902,7 +926,8 @@
                             }
                         });
 
-                        statusRows.push(["", normalizeCategory(item.category), item.name, stockAtPrevEnd, stockAtCurrentEnd]);
+                        // 품명(item.name)과 규격(item.memo)을 각각 분리하여 셀에 바인딩
+                        statusRows.push(["", normalizeCategory(item.category), item.name, item.memo || "", stockAtPrevEnd, stockAtCurrentEnd]);
                     });
                 }
 
@@ -910,28 +935,28 @@
                     [],
                     ["", "입 고 현 황"], 
                     [],
-                    ["", "입고날짜", "분류", "제품명", "입고수량", "비고"]
+                    ["", "입고날짜", "분류", "품 명", "규 격", "입고수량", "비고"]
                 ];
 
                 const outRows = [
                     [],
                     ["", "출 고 현 황"],
                     [],
-                    ["", "출고날짜", "분류", "제품명", "출고수량", "비고"]
+                    ["", "출고날짜", "분류", "품 명", "규 격", "출고수량", "비고"]
                 ];
 
                 filteredLogs.forEach(log => {
                     const dt = new Date(log.created_at);
                     const dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-                    const category = itemMap[log.item_name] || "기존분류";
+                    const itemMeta = itemMap[log.item_name] || { cat: "기존분류", spec: "" };
                     const pName = log.item_name || "";
                     const qty = parseInt(log.count) || 0;
                     const note = log.note || "";
 
                     if(log.type === '입고') {
-                        inRows.push(["", dateStr, category, pName, qty, note]);
+                        inRows.push(["", dateStr, itemMeta.cat, pName, itemMeta.spec, qty, note]);
                     } else if(log.type === '출고') {
-                        outRows.push(["", dateStr, category, pName, qty, note]);
+                        outRows.push(["", dateStr, itemMeta.cat, pName, itemMeta.spec, qty, note]);
                     }
                 });
 
@@ -966,33 +991,33 @@
                 }
 
                 if(wsStatus["B2"]) wsStatus["B2"].s = titleStyle;
-                for(let col = 1; col <= 4; col++) {
+                for(let col = 1; col <= 5; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsStatus[cellRef]) wsStatus[cellRef].s = headerStyle;
                 }
                 applyFontToSheet(wsStatus);
 
                 if(wsIn["B2"]) wsIn["B2"].s = titleStyle;
-                for(let col = 1; col <= 5; col++) {
+                for(let col = 1; col <= 6; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsIn[cellRef]) wsIn[cellRef].s = headerStyle;
                 }
                 applyFontToSheet(wsIn);
 
                 if(wsOut["B2"]) wsOut["B2"].s = titleStyle;
-                for(let col = 1; col <= 5; col++) {
+                for(let col = 1; col <= 6; col++) {
                     const cellRef = XLSX.utils.encode_cell({r: 3, c: col});
                     if(wsOut[cellRef]) wsOut[cellRef].s = headerStyle;
                 }
                 applyFontToSheet(wsOut);
 
-                wsStatus['!cols'] = [{wch:5}, {wch:22}, {wch:30}, {wch:18}, {wch:22}];
+                wsStatus['!cols'] = [{wch:5}, {wch:22}, {wch:30}, {wch:20}, {wch:18}, {wch:22}];
                 XLSX.utils.book_append_sheet(wb, wsStatus, "월별재고현황");
 
-                wsIn['!cols'] = [{wch:5}, {wch:18}, {wch:22}, {wch:30}, {wch:15}, {wch:35}];
+                wsIn['!cols'] = [{wch:5}, {wch:18}, {wch:22}, {wch:30}, {wch:20}, {wch:15}, {wch:35}];
                 XLSX.utils.book_append_sheet(wb, wsIn, "입고현황");
 
-                wsOut['!cols'] = [{wch:5}, {wch:18}, {wch:22}, {wch:30}, {wch:15}, {wch:35}];
+                wsOut['!cols'] = [{wch:5}, {wch:18}, {wch:22}, {wch:30}, {wch:20}, {wch:15}, {wch:35}];
                 XLSX.utils.book_append_sheet(wb, wsOut, "출고현황");
 
                 const dateInfo = targetMonth.trim() !== "" ? targetMonth.trim() : "전체기간";
