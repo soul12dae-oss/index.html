@@ -20,12 +20,18 @@
         button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
         button.btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; font-size: 12px; cursor: pointer; font-weight: bold; }
         
+        /* 폴더 스타일 및 접기/펼치기 지원 */
         .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; position: relative; transition: all 0.2s; }
-        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+        .items-drag-container { display: block; }
+        .items-drag-container.collapsed { display: none !important; }
+        .fold-icon { font-size: 14px; margin-left: 6px; color: #a0a0a0; transition: transform 0.2s; }
+        .collapsed .fold-icon { transform: rotate(-90deg); }
         
+        /* 더보기 메뉴 컨테이너 위치 수정 */
         .more-menu-container { position: relative; display: inline-block; }
         .more-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; color: #6c757d; font-weight: bold; }
-        .more-dropdown { display: none; position: fixed; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
+        .more-dropdown { display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
         .more-dropdown.show { display: block; }
         .more-dropdown button { width: 100%; padding: 11px 14px; border: none; background: white; text-align: left; font-size: 13px; cursor: pointer; color: #333; display: block; box-sizing: border-box; }
         .more-dropdown button:hover { background: #f1f3f5; }
@@ -34,8 +40,8 @@
         .sort-mode-folder-active { border: 2px dashed #0d6efd !important; background: #f1f8ff !important; cursor: move !important; }
         .sort-mode-item-active { border: 2px dashed #ffc107 !important; background: #fffde7 !important; cursor: move !important; }
 
-        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: hidden; position: relative; transition: all 0.2s; }
-        .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; }
+        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: visible; position: relative; transition: all 0.2s; }
+        .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; position: relative; }
         .item-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
         .stock-badge { background: #e2e3e5; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #111; border: 1px solid #ced4da; font-weight: 800; }
         
@@ -179,6 +185,7 @@
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
         </div>
         <p style="font-size:12px; color:#6c757d; margin-top:-5px;">
+            * 폴더 이름을 누르면 하위 물품 목록을 접거나 펼칠 수 있습니다.<br>
             * 정렬 모드 버튼을 누르면 파일(파란 점선)과 내부 물품(노란 점선)을 동시에 드래그하여 정렬할 수 있습니다.
         </p>
         <div id="itemStatusList">데이터를 불러오는 중...</div>
@@ -202,6 +209,7 @@
         let globalItemSortables = [];
         let latestRawItems = [];
         let globalLogsData = [];
+        let collapsedFolders = {}; // 접힌 폴더 상태 저장
 
         function openTab(tabId) {
             try {
@@ -254,11 +262,15 @@
                 btn.innerText = '🔄 정렬 모드: ON';
                 btn.classList.add('active-mode');
                 
+                // 정렬 모드일 때는 모든 폴더를 임시로 펼쳐줍니다.
+                document.querySelectorAll('.items-drag-container').forEach(dc => dc.classList.remove('collapsed'));
+                
                 document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
                 globalFolderSortable = Sortable.create(container, {
                     animation: 200,
                     ghostClass: 'sortable-ghost',
                     chosenClass: 'sortable-chosen',
+                    handle: '.category-title',
                     onEnd() {
                         const sections = container.querySelectorAll('.category-section');
                         const newFolderOrder = [];
@@ -314,9 +326,6 @@
                     document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
                 }
             });
-
-            window.addEventListener('scroll', updateOpenDropdownPosition, true);
-            window.addEventListener('resize', updateOpenDropdownPosition);
         };
 
         function getFormattedDate() {
@@ -493,27 +502,22 @@
             
             if(!isOpen && dropdown) {
                 dropdown.classList.add('show');
-                btn.setAttribute('data-active-dropdown', 'true');
-                positionDropdown(btn, dropdown);
-            } else {
-                btn.removeAttribute('data-active-dropdown');
             }
         }
 
-        function positionDropdown(btn, dropdown) {
-            const rect = btn.getBoundingClientRect();
-            dropdown.style.top = (rect.bottom + window.scrollY) + 'px';
-            dropdown.style.left = (rect.right - dropdown.offsetWidth + window.scrollX) + 'px';
-            dropdown.style.position = 'fixed';
-        }
-
-        function updateOpenDropdownPosition() {
-            const activeBtn = document.querySelector('[data-active-dropdown="true"]');
-            if (activeBtn) {
-                const dropdown = activeBtn.nextElementSibling;
-                if (dropdown && dropdown.classList.contains('show')) {
-                    positionDropdown(activeBtn, dropdown);
-                }
+        // 폴더 접고 펼치기 핸들러
+        function toggleFolder(catName) {
+            if(currentSortMode === 1) return; // 정렬 모드일 때는 접기 금지
+            const container = document.getElementById(`folder-container-${catName}`);
+            const titleEl = container.previousElementSibling;
+            if(container.classList.contains('collapsed')) {
+                container.classList.remove('collapsed');
+                titleEl.classList.remove('collapsed');
+                collapsedFolders[catName] = false;
+            } else {
+                container.classList.add('collapsed');
+                titleEl.classList.add('collapsed');
+                collapsedFolders[catName] = true;
             }
         }
 
@@ -615,9 +619,11 @@
                     section.setAttribute('data-catname', catName);
                     if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
+                    const isCollapsed = collapsedFolders[catName] === true;
+
                     section.innerHTML = `
-                        <div class="category-title">
-                            <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span></div>
+                        <div class="category-title ${isCollapsed ? 'collapsed' : ''}" onclick="toggleFolder('${catName}')">
+                            <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span><span class="fold-icon">▼</span></div>
                             <div class="more-menu-container">
                                 <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                 <div class="more-dropdown">
@@ -626,7 +632,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="items-drag-container" style="min-height:20px;"></div>
+                        <div id="folder-container-${catName}" class="items-drag-container ${isCollapsed ? 'collapsed' : ''}" style="min-height:20px;"></div>
                     `;
 
                     const dragContainer = section.querySelector('.items-drag-container');
@@ -691,6 +697,7 @@
                 if(currentSortMode === 1) {
                     globalFolderSortable = Sortable.create(container, {
                         animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+                        handle: '.category-title',
                         onEnd() {
                             const sections = container.querySelectorAll('.category-section');
                             const newFolderOrder = [];
