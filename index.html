@@ -190,7 +190,7 @@
     <div id="status" class="tab-content">
         <h2>전체 현황판</h2>
         <div class="top-action-bar">
-            <button class="excel-btn" onclick="toggleExcelModal(true)">📊 엑셀 일괄 업로드</button>
+            <button class="excel-btn" onclick="toggleExcelModal(true)">📊 엑셀 종류별 일괄 업로드</button>
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
             <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: OFF</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
@@ -206,22 +206,18 @@
     <div id="excelModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <span>📊 엑셀 자재 데이터 일괄 업로드</span>
+                <span>📊 시트이름별 자동 분류 업로드</span>
                 <button class="modal-close" onclick="toggleExcelModal(false)">✕</button>
             </div>
-            <div class="form-group">
-                <label>1. 데이터들을 집어넣을 폴더(분류) 선택</label>
-                <select id="excelCategorySelect" onchange="checkExcelNewCategory(this)"></select>
-                <input type="text" id="excelNewCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류 이름을 입력하세요">
+            <div class="form-group" style="margin-top: 10px;">
+                <label>이카운트 엑셀 파일(.xlsx) 선택</label>
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="padding: 12px; border: 1px dashed #aaa; background: #fafafa; width:100%; box-sizing:border-box;">
             </div>
-            <div class="form-group" style="margin-top: 20px;">
-                <label>2. 엑셀 파일(.xlsx) 선택</label>
-                <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="padding: 8px; border: 1px dashed #aaa; background: #fafafa;">
-            </div>
-            <p style="font-size:11px; color:#6c757d; line-height: 1.4;">
-                * 업로드 시 엑셀 상단의 빈 셀이나 타이틀 줄은 자동으로 무시되며, <strong>'품 명'</strong>과 <strong>'규 격'</strong> 열을 기준으로 물품들이 대량 등록됩니다.
+            <p style="font-size:12px; color:#495057; line-height: 1.5; background:#f1f3f5; padding:10px; border-radius:6px;">
+                💡 <strong>안내:</strong><br>
+                엑셀 파일 내부에 있는 시트 이름(예: <code>이카운트 자재</code>, <code>이카운트+소모품</code> 등)을 시스템이 통째로 분석하여, <strong>해당 이름의 폴더(분류)로 종류별 자동 분할 저장</strong>됩니다.
             </p>
-            <button class="btn" style="background:#198754; margin-top: 10px;" onclick="uploadExcelData()">🚀 DB로 일괄 전송 시작</button>
+            <button class="btn" style="background:#198754; margin-top: 15px;" onclick="uploadExcelData()">🚀 시트별 자동 분류 및 저장 시작</button>
         </div>
     </div>
 
@@ -243,7 +239,7 @@
         let globalItemSortables = [];
         let latestRawItems = [];
         let globalLogsData = [];
-        let collapsedFolders = {}; // 접힌 폴더 상태 저장
+        let collapsedFolders = {}; 
 
         function openTab(tabId) {
             try {
@@ -259,7 +255,7 @@
                 
                 if(tabId === 'main') loadCategories();
                 if(tabId === 'status') {
-                    collapsedFolders = {}; // 탭 열 때 상태 초기화 (기본 다 닫히도록)
+                    collapsedFolders = {}; 
                     loadInventoryStatus();
                 }
                 if(tabId === 'inflow' || tabId === 'outflow') loadItems();
@@ -299,7 +295,6 @@
                 btn.innerText = '🔄 정렬 모드: ON';
                 btn.classList.add('active-mode');
                 
-                // 정렬 모드일 때는 드래그를 위해 모든 폴더를 강제로 열어줍니다.
                 document.querySelectorAll('.items-drag-container').forEach(dc => dc.classList.remove('collapsed'));
                 document.querySelectorAll('.category-title').forEach(ct => ct.classList.remove('collapsed'));
                 
@@ -416,11 +411,6 @@
             if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
             else { input.style.display = 'none'; }
         }
-        function checkExcelNewCategory(select) {
-            const input = document.getElementById('excelNewCategoryInput');
-            if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
-            else { input.style.display = 'none'; }
-        }
         function normalizeCategory(cat) {
             if(!cat || String(cat).trim() === '' || String(cat).trim() === 'null') return '미지정분류';
             return String(cat).trim();
@@ -445,8 +435,6 @@
                 localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
                 
                 const select = document.getElementById('itemCategorySelect');
-                const excelSelect = document.getElementById('excelCategorySelect');
-                
                 let options = '';
                 if(globalCategories.length === 0) {
                     options += `<option value="">선택 가능한 분류 없음 (새 분류를 생성하세요)</option>`;
@@ -456,10 +444,7 @@
                 options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
                 
                 if(select) select.innerHTML = options;
-                if(excelSelect) excelSelect.innerHTML = options;
-                
                 document.getElementById('newCategoryInput').style.display = 'none';
-                document.getElementById('excelNewCategoryInput').style.display = 'none';
             } catch (e) { console.error(e); }
         }
 
@@ -555,7 +540,6 @@
         function toggleExcelModal(show) {
             const modal = document.getElementById('excelModal');
             if(show) {
-                loadCategories();
                 modal.style.display = 'flex';
             } else {
                 modal.style.display = 'none';
@@ -563,20 +547,10 @@
             }
         }
 
-        // 엑셀 가공 및 서버 업로드 로직
+        // 🌟 [핵심 코드 업데이트]: 사용자가 폴더를 지정하지 않고, 엑셀 시트명 종류별로 자동 파싱하여 일괄 업로드 진행
         function uploadExcelData() {
-            const select = document.getElementById('excelCategorySelect');
-            const newInput = document.getElementById('excelNewCategoryInput');
-            let targetCategory = select.value;
-            
-            if(targetCategory === '__NEW__') {
-                targetCategory = newInput.value.trim();
-            }
-            if(!targetCategory) return alert('자재를 등록할 폴더(분류)를 먼저 지정해 주세요.');
-            targetCategory = normalizeCategory(targetCategory);
-
             const fileInput = document.getElementById('excelFileInput');
-            if(fileInput.files.length === 0) return alert('업로드할 엑셀 파일을 선택하세요.');
+            if(fileInput.files.length === 0) return alert('업로드할 이카운트 엑셀 파일을 먼저 선택하세요.');
 
             const file = fileInput.files[0];
             const reader = new FileReader();
@@ -586,88 +560,97 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     
-                    // 첫 번째 시트를 기본으로 가져옴
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    // 2차원 배열 형태로 엑셀 파싱
-                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                    
-                    let headerIndex = -1;
-                    // '품 명'이 있는 실제 데이터 시작 행 탐색
-                    for(let i=0; i<rows.length; i++) {
-                        if(rows[i].includes('품 명') || rows[i].includes('품명')) {
-                            headerIndex = i;
-                            break;
+                    const allInsertItems = [];
+                    const parsedSheetNames = [];
+
+                    // 엑셀 내 모든 시트(종류)를 순회합니다.
+                    for (let sheetName of workbook.SheetNames) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        if (rows.length === 0) continue;
+
+                        let headerIndex = -1;
+                        // '품 명' 혹은 '품명'이 들어간 실제 자재 시작 행 추적
+                        for(let i=0; i<rows.length; i++) {
+                            if(rows[i] && (rows[i].includes('품 명') || rows[i].includes('품명'))) {
+                                headerIndex = i;
+                                break;
+                            }
+                        }
+
+                        // 시트 내에 유효한 양식 헤더가 없다면 패스
+                        if(headerIndex === -1) continue;
+
+                        const headersRow = rows[headerIndex];
+                        const nameIdx = headersRow.findIndex(h => h === '품 명' || h === '품명');
+                        const codeIdx = headersRow.findIndex(h => h === '품목코드');
+                        const specIdx = headersRow.findIndex(h => h === '규 격' || h === '규격');
+                        const unitIdx = headersRow.findIndex(h => h === '단위');
+
+                        let sheetItemCount = 0;
+
+                        for(let i = headerIndex + 1; i < rows.length; i++) {
+                            const row = rows[i];
+                            if(!row || row.length === 0) continue;
+
+                            let pName = row[nameIdx] ? String(row[nameIdx]).trim() : '';
+                            if(!pName || pName === 'undefined' || pName === '품 명' || pName === '품명') continue;
+
+                            let pCode = row[codeIdx] ? String(row[codeIdx]).trim() : '';
+                            let pSpec = row[specIdx] ? String(row[specIdx]).trim() : '';
+                            let pUnit = row[unitIdx] ? String(row[unitIdx]).trim() : '';
+
+                            // 물품명에 규격 병합 처리
+                            let finalName = pName;
+                            if(pSpec && pSpec !== 'undefined' && !finalName.includes(pSpec)) {
+                                finalName += ` (${pSpec.replace(/\s+/g, ' ')})`;
+                            }
+
+                            let memoParts = [];
+                            if(pCode && pCode !== 'undefined') memoParts.push(`코드:${pCode}`);
+                            if(pUnit && pUnit !== 'undefined') memoParts.push(`단위:${pUnit}`);
+                            let finalMemo = memoParts.join(' / ');
+
+                            // ★ 분류(Category)명에 엑셀 시트 이름(sheetName)을 그대로 주입!
+                            allInsertItems.push({
+                                name: finalName,
+                                category: normalizeCategory(sheetName), 
+                                memo: finalMemo,
+                                sort_order: 999
+                            });
+                            sheetItemCount++;
+                        }
+
+                        if (sheetItemCount > 0) {
+                            parsedSheetNames.push(`${sheetName} (${sheetItemCount}건)`);
                         }
                     }
 
-                    if(headerIndex === -1) {
-                        return alert('엑셀 시트 안에서 "품 명" 열을 찾을 수 없습니다. 양식을 확인해 주세요.');
+                    if(allInsertItems.length === 0) {
+                        return alert('엑셀 시트 내에서 유효한 "품 명" 데이터를 추출하지 못했습니다.');
                     }
 
-                    const headersRow = rows[headerIndex];
-                    const nameIdx = headersRow.findIndex(h => h === '품 명' || h === '품명');
-                    const codeIdx = headersRow.findIndex(h => h === '품목코드');
-                    const specIdx = headersRow.findIndex(h => h === '규 격' || h === '규격');
-                    const unitIdx = headersRow.findIndex(h => h === '단위');
+                    if(!confirm(`엑셀 분석 결과 발견된 종류:\n---------------------------\n${parsedSheetNames.join('\n')}\n---------------------------\n총 ${allInsertItems.length}개의 자재를 각 시트 이름 폴더로 바로 저장할까요?`)) return;
 
-                    const insertItems = [];
-                    
-                    // 헤더 다음 행부터 데이터 추출
-                    for(let i = headerIndex + 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        if(!row || row.length === 0) continue;
-
-                        let pName = row[nameIdx] ? String(row[nameIdx]).trim() : '';
-                        if(!pName || pName === 'undefined' || pName === '품 명') continue; // 공백이거나 타이틀 반복 제거
-
-                        let pCode = row[codeIdx] ? String(row[codeIdx]).trim() : '';
-                        let pSpec = row[specIdx] ? String(row[specIdx]).trim() : '';
-                        let pUnit = row[unitIdx] ? String(row[unitIdx]).trim() : '';
-
-                        // 품명 가독성을 위해 규격이 있다면 뒤에 붙여줌
-                        let finalName = pName;
-                        if(pSpec && pSpec !== 'undefined' && !finalName.includes(pSpec)) {
-                            // 줄바꿈이나 노이즈가 섞여있을 수 있으므로 공백 처리 정돈
-                            finalName += ` (${pSpec.replace(/\s+/g, ' ')})`;
-                        }
-
-                        // 메모란에 코드와 단위 세팅
-                        let memoParts = [];
-                        if(pCode && pCode !== 'undefined') memoParts.push(`코드:${pCode}`);
-                        if(pUnit && pUnit !== 'undefined') memoParts.push(`단위:${pUnit}`);
-                        let finalMemo = memoParts.join(' / ');
-
-                        insertItems.push({
-                            name: finalName,
-                            category: targetCategory,
-                            memo: finalMemo,
-                            sort_order: 999
-                        });
-                    }
-
-                    if(insertItems.length === 0) {
-                        return alert('등록 가능한 물품 데이터가 존재하지 않습니다.');
-                    }
-
-                    if(!confirm(`엑셀 파일에서 총 ${insertItems.length}개의 자재 물품을 추출했습니다.\n[ ${targetCategory} ] 폴더로 일괄 등록할까요?`)) return;
-
-                    // 동기화 요청 (Supabase 일괄 insert)
+                    // Supabase 일괄 insert 전송
                     const response = await fetch(`${BASE_URL}/items`, {
                         method: 'POST',
                         headers: headers,
-                        body: JSON.stringify(insertItems)
+                        body: JSON.stringify(allInsertItems)
                     });
 
                     if(response.ok) {
-                        alert(`🎉 성공적으로 ${insertItems.length}개의 자재 데이터가 동기화 등록되었습니다.`);
+                        alert(`🎉 분류 저장 완료!\n총 ${allInsertItems.length}개의 품목이 시트명 별로 자동 정돈되었습니다.`);
                         toggleExcelModal(false);
                         
-                        if(!globalCategories.includes(targetCategory)) {
-                            globalCategories.push(targetCategory);
-                            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                        }
+                        // 새로 추가된 시트 이름들을 로컬 정렬 바에 자동 추가
+                        allInsertItems.forEach(item => {
+                            if(!globalCategories.includes(item.category)) {
+                                globalCategories.push(item.category);
+                            }
+                        });
+                        localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
                         
                         loadInventoryStatus();
                     } else {
@@ -676,16 +659,15 @@
                     }
 
                 } catch (err) {
-                    alert('엑셀 파일 분석 또는 DB 전송 오류: ' + err.message);
+                    alert('엑셀 분석 중 오류가 발생했습니다: ' + err.message);
                 }
             };
 
             reader.readAsArrayBuffer(file);
         }
 
-        // 폴더 접고 펼치기 핸들러
         function toggleFolder(catName) {
-            if(currentSortMode === 1) return; // 정렬 모드일 때는 접기 금지
+            if(currentSortMode === 1) return; 
             const container = document.getElementById(`folder-container-${catName}`);
             const titleEl = container.previousElementSibling;
             if(container.classList.contains('collapsed')) {
@@ -753,15 +735,7 @@
             if(!isoString) return "-";
             const d = new Date(isoString);
             if(isNaN(d.getTime())) return "-";
-            
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const date = String(d.getDate()).padStart(2, '0');
-            const h = String(d.getHours()).padStart(2, '0');
-            const m = String(d.getMinutes()).padStart(2, '0');
-            const s = String(d.getSeconds()).padStart(2, '0');
-            
-            return `${year}-${month}-${date} ${h}:${m}:${s}`;
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
         }
 
         async function loadInventoryStatus() {
@@ -797,7 +771,6 @@
                     section.setAttribute('data-catname', catName);
                     if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
-                    // 지정된 상태가 없으면 기본적으로 닫힌(true) 상태로 설정합니다.
                     if (collapsedFolders[catName] === undefined) {
                         collapsedFolders[catName] = true;
                     }
@@ -914,7 +887,6 @@
             if(headerElement && headerElement.nextElementSibling && !event.target.classList.contains('more-btn')) {
                 const historyBox = headerElement.nextElementSibling;
                 historyBox.classList.toggle('show');
-                
                 if(historyBox.classList.contains('show')) {
                     const yearSelect = historyBox.querySelector('.filter-year');
                     filterItemLogsByMonth(itemName, yearSelect);
@@ -932,7 +904,6 @@
             if(!rowsContainer) return;
 
             const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === itemName) : [];
-            
             let runningStock = 0;
             const logsWithRunningStock = itemLogs.map(log => {
                 if(log.type === '입고') runningStock += (log.count || 0);
