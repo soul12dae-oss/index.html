@@ -25,10 +25,10 @@
         .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
         .items-drag-container { display: block; }
         .items-drag-container.collapsed { display: none !important; }
-        .fold-icon { font-size: 14px; margin-left: 6px; color: #a0a0a0; transition: transform 0.2s; }
-        .collapsed .fold-icon { transform: rotate(-90deg); }
+        .fold-icon { font-size: 14px; margin-left: 6px; color: #a0a0a0; transition: transform 0.2s; transform: rotate(0deg); }
+        .category-title.collapsed .fold-icon { transform: rotate(-90deg); }
         
-        /* 더보기 메뉴 컨테이너 위치 수정 */
+        /* 더보기 메뉴 컨테이너 */
         .more-menu-container { position: relative; display: inline-block; }
         .more-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; color: #6c757d; font-weight: bold; }
         .more-dropdown { display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
@@ -224,7 +224,10 @@
                 if (targetBtn) targetBtn.classList.add('active-btn');
                 
                 if(tabId === 'main') loadCategories();
-                if(tabId === 'status') loadInventoryStatus();
+                if(tabId === 'status') {
+                    collapsedFolders = {}; // 탭 열 때 상태 초기화 (기본 다 닫히도록)
+                    loadInventoryStatus();
+                }
                 if(tabId === 'inflow' || tabId === 'outflow') loadItems();
                 if(tabId === 'notepad') renderNotes();
             } catch (err) { console.error(err); }
@@ -262,8 +265,9 @@
                 btn.innerText = '🔄 정렬 모드: ON';
                 btn.classList.add('active-mode');
                 
-                // 정렬 모드일 때는 모든 폴더를 임시로 펼쳐줍니다.
+                // 정렬 모드일 때는 드래그를 위해 모든 폴더를 강제로 열어줍니다.
                 document.querySelectorAll('.items-drag-container').forEach(dc => dc.classList.remove('collapsed'));
+                document.querySelectorAll('.category-title').forEach(ct => ct.classList.remove('collapsed'));
                 
                 document.querySelectorAll('.category-section').forEach(s => s.classList.add('sort-mode-folder-active'));
                 globalFolderSortable = Sortable.create(container, {
@@ -619,6 +623,10 @@
                     section.setAttribute('data-catname', catName);
                     if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
+                    // 지정된 상태가 없으면 기본적으로 닫힌(true) 상태로 설정합니다.
+                    if (collapsedFolders[catName] === undefined) {
+                        collapsedFolders[catName] = true;
+                    }
                     const isCollapsed = collapsedFolders[catName] === true;
 
                     section.innerHTML = `
