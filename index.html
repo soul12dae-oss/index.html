@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>자재 입출고 관리 시스템 Pro (이카운트 연동 버전)</title>
+    <title>자재 입출고 관리 시스템 Pro (이카운트 엑셀 연동 버전)</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <!-- 엑셀 다운로드 및 스타일 지원 라이브러리 -->
@@ -82,9 +82,13 @@
         .note-input-title { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: bold; color: #222; outline: none; padding: 0; margin-bottom: 2px; }
         .note-input-content { width: 100%; border: none; background: transparent; font-size: 14px; color: #333; outline: none; resize: none; padding: 0; line-height: 1.4; height: 60px; font-family: inherit; }
 
+        .excel-sync-box { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 12px; border-radius: 6px; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .excel-sync-box span { font-size: 13px; color: #2e7d32; font-weight: bold; }
+        .excel-sync-box label { background: #2e7d32; color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; }
+
         @media print {
             body { background: white; color: black; padding: 0; }
-            .nav, .top-action-bar, p, .more-menu-container, .log-actions, .history-month-filter { display: none !important; }
+            .nav, .top-action-bar, p, .more-menu-container, .log-actions, .history-month-filter, .excel-sync-box { display: none !important; }
             .tab-content { display: none !important; box-shadow: none; padding: 0; max-width: 100%; }
             #status.tab-content { display: block !important; }
             .category-section { border: 1px solid #333; background: white; page-break-inside: avoid; }
@@ -107,9 +111,20 @@
     <!-- 1. 메인 화면 -->
     <div id="main" class="tab-content active">
         <h2>물품 등록</h2>
+        
+        <!-- 이카운트 엑셀 파일 가져오기 업로드 세션 추가 -->
+        <div class="excel-sync-box">
+            <span>📊 [이카운트.xlsx] 파일 연동 대기</span>
+            <label for="excelFileInput">파일 선택</label>
+            <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none;" onchange="handleExcelImport(this)">
+        </div>
+
         <div class="form-group">
             <label>분류 (파일/폴더 선택 및 생성)</label>
-            <select id="itemCategorySelect" onchange="checkNewCategory(this)"></select>
+            <select id="itemCategorySelect" onchange="checkNewCategory(this)">
+                <option value="이카운트 자재">이카운트 자재</option>
+                <option value="이카운트+소모품">이카운트+소모품</option>
+            </select>
             <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류(파일) 이름을 입력하세요">
         </div>
         <div class="form-group">
@@ -121,8 +136,8 @@
             <input type="text" id="itemSpec" placeholder="예: KCD-4">
         </div>
         <div class="form-group">
-            <label>기타 메모</label>
-            <input type="text" id="itemMemo" placeholder="제조사, 단위 등 기타 사항">
+            <label>기타 메모 (단위 등)</label>
+            <input type="text" id="itemMemo" placeholder="단위, 제조사 등 기타 사항">
         </div>
         <button class="btn" onclick="addItem()">물품 등록하기</button>
     </div>
@@ -202,7 +217,8 @@
             "Prefer": "return=representation"
         };
 
-        let globalCategories = [];
+        // 초기 카테고리를 제공해주신 엑셀 시트명 기반으로 매핑
+        let globalCategories = ["이카운트 자재", "이카운트+소모품"];
         let stickyNotes = [];
         let currentSortMode = 0; 
         let globalFolderSortable = null;
@@ -371,6 +387,62 @@
             });
         }
 
+        // [이카운트 엑셀 임포트 엔진] 사용자 업로드 엑셀 파일 구문 분석 및 DB 연동 파트
+        async function handleExcelImport(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    let importedCount = 0;
+                    
+                    // 분석 타겟 시트 정의 (이카운트 자재, 이카운트+소모품)
+                    const targetSheets = ["이카운트 자재", "이카운트+소모품"];
+                    
+                    for (const sheetName of targetSheets) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        if (!worksheet) continue;
+                        
+                        // JSON 형태로 변환
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                        
+                        for (const row of jsonData) {
+                            // 엑셀 컬럼명 매칭 파트 (품명, 규격, 단위 추출)
+                            const pName = row["품명"] || row["품 명"] || row["품목명"];
+                            const pSpec = row["규격"] || row["규 격"] || "";
+                            const pUnit = row["단위"] || "";
+                            
+                            if (!pName) continue; // 품명이 없는 빈 로우 패스
+
+                            // Supabase DB에 자동 등록 트랜잭션 수행
+                            await fetch(`${BASE_URL}/items`, {
+                                method: 'POST', 
+                                headers,
+                                body: JSON.stringify({ 
+                                    name: pName.trim(), 
+                                    memo: pSpec ? pSpec.trim() : pUnit.trim(), 
+                                    category: sheetName, 
+                                    sort_order: 999 
+                                })
+                            });
+                            importedCount++;
+                        }
+                    }
+                    
+                    alert(`🎉 엑셀 연동 성공! 총 ${importedCount}개의 품목이 분류별로 매칭 및 서버 등록되었습니다.`);
+                    loadCategories();
+                    loadItems();
+                } catch (err) {
+                    alert("엑셀 파일 파싱 오류: " + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         function checkNewCategory(select) {
             const input = document.getElementById('newCategoryInput');
             if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
@@ -402,11 +474,7 @@
                 const select = document.getElementById('itemCategorySelect');
                 if(select) {
                     let options = '';
-                    if(globalCategories.length === 0) {
-                        options += `<option value="">선택 가능한 분류 없음 (새 분류를 생성하세요)</option>`;
-                    } else {
-                        globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
-                    }
+                    globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
                     options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
                     select.innerHTML = options;
                     document.getElementById('newCategoryInput').style.display = 'none';
@@ -423,7 +491,6 @@
                 if(Array.isArray(data)){
                     data.forEach(item => { 
                         if(item && item.name) {
-                            // 화면에 표시할 때는 품명과 규격을 조합해서 직관적으로 식별할 수 있도록 합니다.
                             const displayTxt = item.memo ? `${item.name} (${item.memo})` : item.name;
                             options += `<option value="${item.name}">${displayTxt}</option>`; 
                         }
@@ -451,7 +518,6 @@
             
             if(!name) return alert('품명을 입력해주세요.');
 
-            // [핵심 매칭 설계] 이카운트 엑셀 구조와 연동되도록 memo 필드에 규격을 핵심으로 저장하거나 혼합 관리할 수 있도록 구조화
             try {
                 const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
                 const countData = await countRes.json();
@@ -461,7 +527,7 @@
                     method: 'POST', headers,
                     body: JSON.stringify({ 
                         name: name, 
-                        memo: spec ? spec : memo, // 규격 값이 있으면 우선적으로 memo 컬럼에 할당해 엑셀 매칭 활용
+                        memo: spec ? spec : memo, 
                         category: category, 
                         sort_order: nextOrder 
                     })
@@ -472,6 +538,7 @@
                 document.getElementById('itemMemo').value = '';
                 newInput.value = '';
                 loadCategories();
+                loadItems();
             } catch (error) { alert("오류: " + error.message); }
         }
 
@@ -638,7 +705,6 @@
                     section.setAttribute('data-catname', catName);
                     if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
-                    // 화면 카드 헤더 구조 렌더링
                     section.innerHTML = `
                         <div class="category-title">
                             <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span></div>
@@ -676,7 +742,6 @@
                             const currentYear = now.getFullYear();
                             const currentMonth = now.getMonth() + 1;
 
-                            // 규격 정보가 존재하면 타이틀 옆에 같이 바인딩
                             const displayTitle = item.memo ? `${item.name} [${item.memo}]` : item.name;
 
                             card.innerHTML = `
@@ -859,7 +924,6 @@
             } catch (e) { alert(e.message); }
         }
 
-        // [핵심 이카운트 연동 로직] 엑셀 저장 시 품명과 규격을 완전 분할하여 다운로드하는 로직으로 전면 업그레이드
         async function exportToExcel() {
             try {
                 const targetMonth = prompt("출력할 연도와 월을 입력하세요 (예: 2026-07)\n공백으로 두면 전체 기간 데이터를 저장합니다:");
@@ -899,7 +963,6 @@
                 const previousMonthEnd = new Date(searchYear, searchMonth - 1, 1, 0, 0, 0, 0);
                 const currentMonthEnd = new Date(searchYear, searchMonth, 0, 23, 59, 59, 999);
 
-                // [새 이카운트 맞춤 헤더 설정] 품명과 규격을 나란히 배치하는 구조 설계
                 const statusRows = [
                     [],
                     ["", `${searchYear}년 ${searchMonth}월 제품 총 재고 현황 (이카운트 규격 매칭)`],
@@ -926,7 +989,6 @@
                             }
                         });
 
-                        // 품명(item.name)과 규격(item.memo)을 각각 분리하여 셀에 바인딩
                         statusRows.push(["", normalizeCategory(item.category), item.name, item.memo || "", stockAtPrevEnd, stockAtCurrentEnd]);
                     });
                 }
@@ -1029,5 +1091,7 @@
             }
         }
     </script>
+    <!-- 엑셀 파일 로드 처리를 위한 필수 XLSX 코어 라이브러리 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>
