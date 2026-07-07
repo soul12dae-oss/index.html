@@ -6,6 +6,8 @@
     <title>자재 입출고 관리 시스템 Pro</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- 엑셀 파일 파싱 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
         .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; }
@@ -65,10 +67,18 @@
         
         .top-action-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
         .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
+        .excel-btn { background: #0ea5e9; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
         .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
         
         .toggle-sort-btn { background: #fff; color: #495057; border: 2px solid #ced4da; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; transition: all 0.2s; }
         .toggle-sort-btn.active-mode { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+
+        /* 엑셀 모달 팝업 스타일 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 25px; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
+        .modal-close:hover { color: #000; }
 
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
         .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -88,7 +98,7 @@
 
         @media print {
             body { background: white; color: black; padding: 0; }
-            .nav, .top-action-bar, p, .more-menu-container, .log-actions, .history-month-filter { display: none !important; }
+            .nav, .top-action-bar, p, .more-menu-container, .log-actions, .history-month-filter, .modal { display: none !important; }
             .tab-content { display: none !important; box-shadow: none; padding: 0; max-width: 100%; }
             #status.tab-content { display: block !important; }
             .category-section { border: 1px solid #333; background: white; page-break-inside: avoid; }
@@ -180,6 +190,7 @@
     <div id="status" class="tab-content">
         <h2>전체 현황판</h2>
         <div class="top-action-bar">
+            <button class="excel-btn" onclick="toggleExcelModal(true)">📊 엑셀 일괄 업로드</button>
             <button class="print-btn" onclick="window.print()">🖨️ 현황판 인쇄</button>
             <button id="globalSortMasterBtn" class="toggle-sort-btn" onclick="rotateSortMode()">↕️ 정렬 모드: OFF</button>
             <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 파일(폴더) 만들기</button>
@@ -189,6 +200,29 @@
             * 정렬 모드 버튼을 누르면 파일(파란 점선)과 내부 물품(노란 점선)을 동시에 드래그하여 정렬할 수 있습니다.
         </p>
         <div id="itemStatusList">데이터를 불러오는 중...</div>
+    </div>
+
+    <!-- 엑셀 파일 업로드 팝업 모달 -->
+    <div id="excelModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span>📊 엑셀 자재 데이터 일괄 업로드</span>
+                <button class="modal-close" onclick="toggleExcelModal(false)">✕</button>
+            </div>
+            <div class="form-group">
+                <label>1. 데이터들을 집어넣을 폴더(분류) 선택</label>
+                <select id="excelCategorySelect" onchange="checkExcelNewCategory(this)"></select>
+                <input type="text" id="excelNewCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류 이름을 입력하세요">
+            </div>
+            <div class="form-group" style="margin-top: 20px;">
+                <label>2. 엑셀 파일(.xlsx) 선택</label>
+                <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="padding: 8px; border: 1px dashed #aaa; background: #fafafa;">
+            </div>
+            <p style="font-size:11px; color:#6c757d; line-height: 1.4;">
+                * 업로드 시 엑셀 상단의 빈 셀이나 타이틀 줄은 자동으로 무시되며, <strong>'품 명'</strong>과 <strong>'규 격'</strong> 열을 기준으로 물품들이 대량 등록됩니다.
+            </p>
+            <button class="btn" style="background:#198754; margin-top: 10px;" onclick="uploadExcelData()">🚀 DB로 일괄 전송 시작</button>
+        </div>
     </div>
 
     <script>
@@ -382,6 +416,11 @@
             if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
             else { input.style.display = 'none'; }
         }
+        function checkExcelNewCategory(select) {
+            const input = document.getElementById('excelNewCategoryInput');
+            if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
+            else { input.style.display = 'none'; }
+        }
         function normalizeCategory(cat) {
             if(!cat || String(cat).trim() === '' || String(cat).trim() === 'null') return '미지정분류';
             return String(cat).trim();
@@ -406,17 +445,21 @@
                 localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
                 
                 const select = document.getElementById('itemCategorySelect');
-                if(select) {
-                    let options = '';
-                    if(globalCategories.length === 0) {
-                        options += `<option value="">선택 가능한 분류 없음 (새 분류를 생성하세요)</option>`;
-                    } else {
-                        globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
-                    }
-                    options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
-                    select.innerHTML = options;
-                    document.getElementById('newCategoryInput').style.display = 'none';
+                const excelSelect = document.getElementById('excelCategorySelect');
+                
+                let options = '';
+                if(globalCategories.length === 0) {
+                    options += `<option value="">선택 가능한 분류 없음 (새 분류를 생성하세요)</option>`;
+                } else {
+                    globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
                 }
+                options += `<option value="__NEW__">+ 새 분류 파일 만들기...</option>`;
+                
+                if(select) select.innerHTML = options;
+                if(excelSelect) excelSelect.innerHTML = options;
+                
+                document.getElementById('newCategoryInput').style.display = 'none';
+                document.getElementById('excelNewCategoryInput').style.display = 'none';
             } catch (e) { console.error(e); }
         }
 
@@ -507,6 +550,137 @@
             if(!isOpen && dropdown) {
                 dropdown.classList.add('show');
             }
+        }
+
+        function toggleExcelModal(show) {
+            const modal = document.getElementById('excelModal');
+            if(show) {
+                loadCategories();
+                modal.style.display = 'flex';
+            } else {
+                modal.style.display = 'none';
+                document.getElementById('excelFileInput').value = '';
+            }
+        }
+
+        // 엑셀 가공 및 서버 업로드 로직
+        function uploadExcelData() {
+            const select = document.getElementById('excelCategorySelect');
+            const newInput = document.getElementById('excelNewCategoryInput');
+            let targetCategory = select.value;
+            
+            if(targetCategory === '__NEW__') {
+                targetCategory = newInput.value.trim();
+            }
+            if(!targetCategory) return alert('자재를 등록할 폴더(분류)를 먼저 지정해 주세요.');
+            targetCategory = normalizeCategory(targetCategory);
+
+            const fileInput = document.getElementById('excelFileInput');
+            if(fileInput.files.length === 0) return alert('업로드할 엑셀 파일을 선택하세요.');
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 첫 번째 시트를 기본으로 가져옴
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // 2차원 배열 형태로 엑셀 파싱
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    
+                    let headerIndex = -1;
+                    // '품 명'이 있는 실제 데이터 시작 행 탐색
+                    for(let i=0; i<rows.length; i++) {
+                        if(rows[i].includes('품 명') || rows[i].includes('품명')) {
+                            headerIndex = i;
+                            break;
+                        }
+                    }
+
+                    if(headerIndex === -1) {
+                        return alert('엑셀 시트 안에서 "품 명" 열을 찾을 수 없습니다. 양식을 확인해 주세요.');
+                    }
+
+                    const headersRow = rows[headerIndex];
+                    const nameIdx = headersRow.findIndex(h => h === '품 명' || h === '품명');
+                    const codeIdx = headersRow.findIndex(h => h === '품목코드');
+                    const specIdx = headersRow.findIndex(h => h === '규 격' || h === '규격');
+                    const unitIdx = headersRow.findIndex(h => h === '단위');
+
+                    const insertItems = [];
+                    
+                    // 헤더 다음 행부터 데이터 추출
+                    for(let i = headerIndex + 1; i < rows.length; i++) {
+                        const row = rows[i];
+                        if(!row || row.length === 0) continue;
+
+                        let pName = row[nameIdx] ? String(row[nameIdx]).trim() : '';
+                        if(!pName || pName === 'undefined' || pName === '품 명') continue; // 공백이거나 타이틀 반복 제거
+
+                        let pCode = row[codeIdx] ? String(row[codeIdx]).trim() : '';
+                        let pSpec = row[specIdx] ? String(row[specIdx]).trim() : '';
+                        let pUnit = row[unitIdx] ? String(row[unitIdx]).trim() : '';
+
+                        // 품명 가독성을 위해 규격이 있다면 뒤에 붙여줌
+                        let finalName = pName;
+                        if(pSpec && pSpec !== 'undefined' && !finalName.includes(pSpec)) {
+                            // 줄바꿈이나 노이즈가 섞여있을 수 있으므로 공백 처리 정돈
+                            finalName += ` (${pSpec.replace(/\s+/g, ' ')})`;
+                        }
+
+                        // 메모란에 코드와 단위 세팅
+                        let memoParts = [];
+                        if(pCode && pCode !== 'undefined') memoParts.push(`코드:${pCode}`);
+                        if(pUnit && pUnit !== 'undefined') memoParts.push(`단위:${pUnit}`);
+                        let finalMemo = memoParts.join(' / ');
+
+                        insertItems.push({
+                            name: finalName,
+                            category: targetCategory,
+                            memo: finalMemo,
+                            sort_order: 999
+                        });
+                    }
+
+                    if(insertItems.length === 0) {
+                        return alert('등록 가능한 물품 데이터가 존재하지 않습니다.');
+                    }
+
+                    if(!confirm(`엑셀 파일에서 총 ${insertItems.length}개의 자재 물품을 추출했습니다.\n[ ${targetCategory} ] 폴더로 일괄 등록할까요?`)) return;
+
+                    // 동기화 요청 (Supabase 일괄 insert)
+                    const response = await fetch(`${BASE_URL}/items`, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify(insertItems)
+                    });
+
+                    if(response.ok) {
+                        alert(`🎉 성공적으로 ${insertItems.length}개의 자재 데이터가 동기화 등록되었습니다.`);
+                        toggleExcelModal(false);
+                        
+                        if(!globalCategories.includes(targetCategory)) {
+                            globalCategories.push(targetCategory);
+                            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
+                        }
+                        
+                        loadInventoryStatus();
+                    } else {
+                        const errLog = await response.text();
+                        throw new Error(errLog);
+                    }
+
+                } catch (err) {
+                    alert('엑셀 파일 분석 또는 DB 전송 오류: ' + err.message);
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
         }
 
         // 폴더 접고 펼치기 핸들러
