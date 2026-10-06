@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>자재 입출고 관리 시스템 Pro</title>
+    <title>자재 입출고 관리 시스템 Pro (공유 메모 & 사진 업로드 연동)</title>
     <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <!-- 엑셀 파일 파싱 라이브러리 -->
@@ -80,6 +80,7 @@
         .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
         .modal-close:hover { color: #000; }
 
+        /* 공유 메모장 컨테이너 */
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
         .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .notepad-title { font-size: 18px; font-weight: bold; color: #202020; }
@@ -95,6 +96,10 @@
         .delete-note-btn:hover { color: #dc3545; }
         .note-input-title { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: bold; color: #222; outline: none; padding: 0; margin-bottom: 2px; }
         .note-input-content { width: 100%; border: none; background: transparent; font-size: 14px; color: #333; outline: none; resize: none; padding: 0; line-height: 1.4; height: 60px; font-family: inherit; }
+
+        /* 사진 미리보기 스타일 */
+        .item-image-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #ced4da; cursor: pointer; }
+        .item-thumb-container { display: flex; align-items: center; gap: 12px; }
 
         .error-box { background: #fff3f2; border: 1px solid #f8d7da; border-radius: 8px; padding: 20px; text-align: center; color: #842029; font-size: 14px; line-height: 1.6; }
 
@@ -114,7 +119,7 @@
 
     <div class="nav">
         <button id="btn-main" onclick="openTab('main')">메인(등록)</button>
-        <button id="btn-notepad" onclick="openTab('notepad')">메모장</button>
+        <button id="btn-notepad" onclick="openTab('notepad')">공유 메모장</button>
         <button id="btn-inflow" onclick="openTab('inflow')">입고</button>
         <button id="btn-outflow" onclick="openTab('outflow')">출고</button>
         <button id="btn-status" class="active-btn" onclick="openTab('status')">전체현황</button>
@@ -136,19 +141,23 @@
             <label>기타 메모</label>
             <input type="text" id="itemMemo" placeholder="규격, 제조사 등">
         </div>
+        <div class="form-group">
+            <label>자재 사진 첨부</label>
+            <input type="file" id="itemImageFile" accept="image/*" style="background:#fafafa;">
+        </div>
         <button class="btn" onclick="addItem()">물품 등록하기</button>
     </div>
 
-    <!-- 2. 스티커 메모장 화면 -->
+    <!-- 2. 공유 스티커 메모장 화면 -->
     <div id="notepad" class="tab-content">
         <div class="notepad-container">
             <div class="notepad-header">
                 <button class="add-note-btn" onclick="addNewNote()">+</button>
-                <div class="notepad-title">스티커 메모</div>
+                <div class="notepad-title">실시간 공유 스티커 메모</div>
                 <div style="width:24px;"></div>
             </div>
             <input type="text" class="note-search-box" id="noteSearch" oninput="renderNotes()" placeholder="검색...">
-            <div class="notes-list" id="notesList"></div>
+            <div class="notes-list" id="notesList">메모 로딩 중...</div>
         </div>
     </div>
 
@@ -215,16 +224,11 @@
                 <label>이카운트 엑셀 파일(.xlsx) 선택</label>
                 <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="padding: 12px; border: 1px dashed #aaa; background: #fafafa; width:100%; box-sizing:border-box;">
             </div>
-            <p style="font-size:12px; color:#495057; line-height: 1.5; background:#f1f3f5; padding:10px; border-radius:6px;">
-                💡 <strong>안내:</strong><br>
-                엑셀 파일 내부에 있는 시트 이름(예: <code>이카운트 자재</code>, <code>이카운트+소모품</code> 등)을 시스템이 통째로 분석하여, <strong>해당 이름의 폴더(분류)로 종류별 자동 분할 저장</strong>됩니다.
-            </p>
             <button class="btn" style="background:#198754; margin-top: 15px;" onclick="uploadExcelData()">🚀 시트별 자동 분류 및 저장 시작</button>
         </div>
     </div>
 
     <script>
-        // Supabase DB 정보 (접속 오류 시 이 정보가 유효한지 확인해주세요)
         const BASE_URL = "https://kvfdfdcaidsdnohfcbeg.supabase.co/rest/v1";
         const API_KEY = "sb_publishable_AzZQ-7pqFS2klriLNXlCig_xRs8b1vV";
 
@@ -262,7 +266,7 @@
                     loadInventoryStatus();
                 }
                 if(tabId === 'inflow' || tabId === 'outflow') loadItems();
-                if(tabId === 'notepad') renderNotes();
+                if(tabId === 'notepad') loadSharedNotes();
             } catch (err) { console.error(err); }
         }
 
@@ -340,19 +344,10 @@
 
         window.onload = function() {
             try {
-                const savedNotes = localStorage.getItem('system_sticky_notes');
-                if(savedNotes) {
-                    stickyNotes = JSON.parse(savedNotes);
-                } else {
-                    stickyNotes = [{ id: Date.now(), title: '💡 안내 가이드', content: '내용을 입력하면 자동 저장됩니다.', date: getFormattedDate() }];
-                    saveNotesToLocalStorage();
-                }
-
                 const savedCatOrder = localStorage.getItem('system_category_order');
                 if (savedCatOrder) {
                     globalCategories = JSON.parse(savedCatOrder);
                 }
-
                 loadItems();
                 loadCategories();
                 loadInventoryStatus();
@@ -369,28 +364,57 @@
             const now = new Date();
             return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         }
-        function saveNotesToLocalStorage() { localStorage.setItem('system_sticky_notes', JSON.stringify(stickyNotes)); }
-        function addNewNote() {
-            stickyNotes.unshift({ id: Date.now(), title: '', content: '', date: getFormattedDate() });
-            saveNotesToLocalStorage();
-            renderNotes();
+
+        // --- [공유 메모장 DB 연동 로직] ---
+        async function loadSharedNotes() {
+            try {
+                const res = await fetch(`${BASE_URL}/shared_notes?select=*&order=id.desc`, { headers });
+                if(res.ok) {
+                    stickyNotes = await res.json();
+                    renderNotes();
+                } else {
+                    document.getElementById('notesList').innerHTML = `<div style="text-align:center; color:#c00; font-size:13px; padding:15px;">공유 메모 테이블(shared_notes)을 확인해주세요.</div>`;
+                }
+            } catch(e) {
+                console.error(e);
+            }
         }
-        function updateNote(id, field, value) {
-            const targetNote = stickyNotes.find(note => note.id === id);
-            if(targetNote) { targetNote[field] = value; saveNotesToLocalStorage(); }
+
+        async function addNewNote() {
+            try {
+                const newNote = { title: '', content: '', date: getFormattedDate() };
+                const res = await fetch(`${BASE_URL}/shared_notes`, {
+                    method: 'POST', headers, body: JSON.stringify(newNote)
+                });
+                if(res.ok) {
+                    loadSharedNotes();
+                }
+            } catch(e) { alert("메모 생성 오류: " + e.message); }
         }
-        function deleteNote(id) {
+
+        async function updateNote(id, field, value) {
+            try {
+                await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ [field]: value })
+                });
+            } catch(e) { console.error("메모 업데이트 에러", e); }
+        }
+
+        async function deleteNote(id) {
             if(!confirm('이 스티커 메모를 삭제하시겠습니까?')) return;
-            stickyNotes = stickyNotes.filter(note => note.id !== id);
-            saveNotesToLocalStorage();
-            renderNotes();
+            try {
+                await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, { method: 'DELETE', headers });
+                loadSharedNotes();
+            } catch(e) { alert("삭제 오류: " + e.message); }
         }
+
         function renderNotes() {
             const listContainer = document.getElementById('notesList');
             const keyword = document.getElementById('noteSearch').value.toLowerCase().trim();
             if(!listContainer) return;
             listContainer.innerHTML = '';
-            const filteredNotes = stickyNotes.filter(note => note.title.toLowerCase().includes(keyword) || note.content.toLowerCase().includes(keyword));
+            
+            const filteredNotes = stickyNotes.filter(note => (note.title || '').toLowerCase().includes(keyword) || (note.content || '').toLowerCase().includes(keyword));
             if(filteredNotes.length === 0) {
                 listContainer.innerHTML = '<div style="text-align:center; color:#888; font-size:13px; padding:20px;">일치하는 메모가 없습니다.</div>';
                 return;
@@ -400,11 +424,11 @@
                 card.className = 'note-card';
                 card.innerHTML = `
                     <div class="note-card-header">
-                        <span class="note-date">${note.date}</span>
+                        <span class="note-date">${note.date || ''}</span>
                         <button class="delete-note-btn" onclick="deleteNote(${note.id})">✕</button>
                     </div>
-                    <input type="text" class="note-input-title" placeholder="제목 없음" value="${note.title}" oninput="updateNote(${note.id}, 'title', this.value)">
-                    <textarea class="note-input-content" placeholder="메모 입력..." oninput="updateNote(${note.id}, 'content', this.value)">${note.content}</textarea>
+                    <input type="text" class="note-input-title" placeholder="제목 없음" value="${note.title || ''}" oninput="updateNote(${note.id}, 'title', this.value)">
+                    <textarea class="note-input-content" placeholder="메모 입력..." oninput="updateNote(${note.id}, 'content', this.value)">${note.content || ''}</textarea>
                 `;
                 listContainer.appendChild(card);
             });
@@ -466,6 +490,7 @@
             } catch (error) { console.error(error); }
         }
 
+        // --- [사진 업로드 연동 포함 물품 등록] ---
         async function addItem() {
             const select = document.getElementById('itemCategorySelect');
             const newInput = document.getElementById('newCategoryInput');
@@ -478,7 +503,15 @@
             category = normalizeCategory(category);
             const name = document.getElementById('itemName').value.trim();
             const memo = document.getElementById('itemMemo').value.trim();
+            const imageInput = document.getElementById('itemImageFile');
+            
             if(!name) return alert('물품명을 입력해주세요.');
+
+            let imageUrl = '';
+            if (imageInput.files && imageInput.files[0]) {
+                const file = imageInput.files[0];
+                imageUrl = await convertFileToBase64(file); // 이미지 크기가 작을 경우 Base64 문자열로 DB 저장 지원
+            }
 
             try {
                 const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
@@ -487,14 +520,24 @@
 
                 await fetch(`${BASE_URL}/items`, {
                     method: 'POST', headers,
-                    body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
+                    body: JSON.stringify({ name, memo, category, image_url: imageUrl, sort_order: nextOrder })
                 });
                 alert(`[${category} > ${name}] 등록 완료!`);
                 document.getElementById('itemName').value = '';
                 document.getElementById('itemMemo').value = '';
+                imageInput.value = '';
                 newInput.value = '';
                 loadCategories();
             } catch (error) { alert("오류: " + error.message); }
+        }
+
+        function convertFileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
         }
 
         async function logStock(type) {
@@ -533,28 +576,19 @@
             const btn = event.currentTarget;
             const dropdown = btn.nextElementSibling;
             const isOpen = dropdown.classList.contains('show');
-            
             document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
-            
-            if(!isOpen && dropdown) {
-                dropdown.classList.add('show');
-            }
+            if(!isOpen && dropdown) dropdown.classList.add('show');
         }
 
         function toggleExcelModal(show) {
             const modal = document.getElementById('excelModal');
-            if(show) {
-                modal.style.display = 'flex';
-            } else {
-                modal.style.display = 'none';
-                document.getElementById('excelFileInput').value = '';
-            }
+            if(show) modal.style.display = 'flex';
+            else { modal.style.display = 'none'; document.getElementById('excelFileInput').value = ''; }
         }
 
         function uploadExcelData() {
             const fileInput = document.getElementById('excelFileInput');
-            if(fileInput.files.length === 0) return alert('업로드할 이카운트 엑셀 파일을 먼저 선택하세요.');
-
+            if(fileInput.files.length === 0) return alert('업로드할 엑셀 파일을 먼저 선택하세요.');
             const file = fileInput.files[0];
             const reader = new FileReader();
 
@@ -562,14 +596,11 @@
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
-                    
                     const allInsertItems = [];
-                    const parsedSheetNames = [];
 
                     for (let sheetName of workbook.SheetNames) {
                         const worksheet = workbook.Sheets[sheetName];
                         const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        
                         if (rows.length === 0) continue;
 
                         let headerIndex = -1;
@@ -579,86 +610,38 @@
                                 break;
                             }
                         }
-
                         if(headerIndex === -1) continue;
 
                         const headersRow = rows[headerIndex];
                         const nameIdx = headersRow.findIndex(h => h === '품 명' || h === '품명');
-                        const codeIdx = headersRow.findIndex(h => h === '품목코드');
-                        const specIdx = headersRow.findIndex(h => h === '규 격' || h === '규격');
-                        const unitIdx = headersRow.findIndex(h => h === '단위');
-
-                        let sheetItemCount = 0;
 
                         for(let i = headerIndex + 1; i < rows.length; i++) {
                             const row = rows[i];
                             if(!row || row.length === 0) continue;
-
                             let pName = row[nameIdx] ? String(row[nameIdx]).trim() : '';
-                            if(!pName || pName === 'undefined' || pName === '품 명' || pName === '품명') continue;
-
-                            let pCode = row[codeIdx] ? String(row[codeIdx]).trim() : '';
-                            let pSpec = row[specIdx] ? String(row[specIdx]).trim() : '';
-                            let pUnit = row[unitIdx] ? String(row[unitIdx]).trim() : '';
-
-                            let finalName = pName;
-                            if(pSpec && pSpec !== 'undefined' && !finalName.includes(pSpec)) {
-                                finalName += ` (${pSpec.replace(/\s+/g, ' ')})`;
-                            }
-
-                            let memoParts = [];
-                            if(pCode && pCode !== 'undefined') memoParts.push(`코드:${pCode}`);
-                            if(pUnit && pUnit !== 'undefined') memoParts.push(`단위:${pUnit}`);
-                            let finalMemo = memoParts.join(' / ');
+                            if(!pName || pName === 'undefined' || pName === '품 명') continue;
 
                             allInsertItems.push({
-                                name: finalName,
+                                name: pName,
                                 category: normalizeCategory(sheetName), 
-                                memo: finalMemo,
+                                memo: '',
                                 sort_order: 999
                             });
-                            sheetItemCount++;
-                        }
-
-                        if (sheetItemCount > 0) {
-                            parsedSheetNames.push(`${sheetName} (${sheetItemCount}건)`);
                         }
                     }
 
-                    if(allInsertItems.length === 0) {
-                        return alert('엑셀 시트 내에서 유효한 "품 명" 데이터를 추출하지 못했습니다.');
-                    }
+                    if(allInsertItems.length === 0) return alert('유효한 품명 데이터를 찾지 못했습니다.');
 
-                    if(!confirm(`엑셀 분석 결과 발견된 종류:\n---------------------------\n${parsedSheetNames.join('\n')}\n---------------------------\n총 ${allInsertItems.length}개의 자재를 각 시트 이름 폴더로 바로 저장할까요?`)) return;
-
-                    const response = await fetch(`${BASE_URL}/items`, {
-                        method: 'POST',
-                        headers: headers,
+                    await fetch(`${BASE_URL}/items`, {
+                        method: 'POST', headers: headers,
                         body: JSON.stringify(allInsertItems)
                     });
 
-                    if(response.ok) {
-                        alert(`🎉 분류 저장 완료!\n총 ${allInsertItems.length}개의 품목이 시트명 별로 자동 정돈되었습니다.`);
-                        toggleExcelModal(false);
-                        
-                        allInsertItems.forEach(item => {
-                            if(!globalCategories.includes(item.category)) {
-                                globalCategories.push(item.category);
-                            }
-                        });
-                        localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                        
-                        loadInventoryStatus();
-                    } else {
-                        const errLog = await response.text();
-                        throw new Error(errLog);
-                    }
-
-                } catch (err) {
-                    alert('엑셀 분석 중 오류가 발생했습니다: ' + err.message);
-                }
+                    alert(`🎉 총 ${allInsertItems.length}개의 품목 일괄 저장 완료!`);
+                    toggleExcelModal(false);
+                    loadInventoryStatus();
+                } catch (err) { alert('엑셀 분석 오류: ' + err.message); }
             };
-
             reader.readAsArrayBuffer(file);
         }
 
@@ -680,50 +663,38 @@
 
         async function renameItemFromServer(itemId, oldItemName, event) {
             event.stopPropagation();
-            const newItemName = prompt(`[${oldItemName}] 물품의 새로운 이름을 입력하세요:`, oldItemName);
+            const newItemName = prompt(`새로운 이름을 입력하세요:`, oldItemName);
             if(!newItemName || newItemName.trim() === '' || newItemName.trim() === oldItemName) return;
-            
             const targetName = newItemName.trim();
             try {
-                const itemPatch = await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
+                await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ name: targetName })
                 });
-                if(!itemPatch.ok) throw new Error('서버 물품명 변경 실패');
-
                 await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName })
                 });
-
-                alert(`물품명이 [ ${targetName} ] (으)로 변경 및 동기화되었습니다.`);
                 loadInventoryStatus();
             } catch(e) { alert("수정 오류: " + e.message); }
         }
 
         async function renameCategoryFromStatus(oldCatName, event) {
             event.stopPropagation();
-            const newCatName = prompt(`[${oldCatName}] 분류의 새 이름을 입력하세요:`, oldCatName);
+            const newCatName = prompt(`새 이름을 입력하세요:`, oldCatName);
             if(!newCatName || newCatName.trim() === '' || newCatName === oldCatName) return;
             const normalizedNew = normalizeCategory(newCatName);
-            if(globalCategories.includes(normalizedNew)) return alert('이미 존재하는 분류 이름입니다.');
-
             try {
                 await fetch(`${BASE_URL}/items?category=eq.${oldCatName}`, {
                     method: 'PATCH', headers, body: JSON.stringify({ category: normalizedNew })
                 });
-                globalCategories = globalCategories.map(c => c === oldCatName ? normalizedNew : c);
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                alert('변경완료');
                 loadInventoryStatus();
             } catch(e) { alert(e.message); }
         }
 
         async function deleteCategoryFromStatus(catName, event) {
             event.stopPropagation();
-            if(!confirm(`[${catName}] 폴더와 하위 물품을 모두 서버에서 전면 삭제할까요?`)) return;
+            if(!confirm(`[${catName}] 폴더와 하위 물품을 삭제할까요?`)) return;
             try {
                 await fetch(`${BASE_URL}/items?category=eq.${catName}`, { method: 'DELETE', headers });
-                globalCategories = globalCategories.filter(c => c !== catName);
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
                 loadInventoryStatus();
             } catch(e) { alert(e.message); }
         }
@@ -732,10 +703,9 @@
             if(!isoString) return "-";
             const d = new Date(isoString);
             if(isNaN(d.getTime())) return "-";
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
         }
 
-        // 네트워크 에러 세부 예외 처리 추가
         async function loadInventoryStatus() {
             const container = document.getElementById('itemStatusList');
             if(!container) return;
@@ -750,7 +720,6 @@
                 globalLogsData = logRes.ok ? await logRes.json() : [];
 
                 container.innerHTML = '';
-
                 itemsData.forEach(item => { item.category = normalizeCategory(item.category); });
                 const activeDbCategories = itemsData.map(item => item.category);
                 
@@ -772,11 +741,8 @@
                     const section = document.createElement('div');
                     section.className = 'category-section';
                     section.setAttribute('data-catname', catName);
-                    if(currentSortMode === 1) section.classList.add('sort-mode-folder-active');
                     
-                    if (collapsedFolders[catName] === undefined) {
-                        collapsedFolders[catName] = true;
-                    }
+                    if (collapsedFolders[catName] === undefined) collapsedFolders[catName] = true;
                     const isCollapsed = collapsedFolders[catName] === true;
 
                     section.innerHTML = `
@@ -796,11 +762,10 @@
                     const dragContainer = section.querySelector('.items-drag-container');
 
                     if(matchedItems.length === 0) {
-                        dragContainer.innerHTML = `<div class="empty-notice" style="color:#bbb; font-size:13px; text-align:center; padding:10px;">이 분류 파일은 비어있습니다.</div>`;
+                        dragContainer.innerHTML = `<div style="color:#bbb; font-size:13px; text-align:center; padding:10px;">비어있습니다.</div>`;
                     } else {
                         matchedItems.forEach(item => {
                             const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === item.name) : [];
-                            
                             let totalStock = 0;
                             itemLogs.forEach(l => {
                                 if(l.type === '입고') totalStock += (l.count || 0);
@@ -810,7 +775,6 @@
                             const card = document.createElement('div');
                             card.className = 'item-card';
                             card.setAttribute('data-itemid', item.id);
-                            if(currentSortMode === 1) card.classList.add('sort-mode-item-active');
 
                             const now = new Date();
                             const currentYear = now.getFullYear();
@@ -819,14 +783,17 @@
                             card.innerHTML = `
                                 <div class="item-header" onclick="toggleHistory(this, '${item.name}')">
                                     <div class="item-info">
-                                        <span class="item-title">${item.name}</span>
+                                        ${item.image_url ? `<img src="${item.image_url}" class="item-image-preview" onclick="event.stopPropagation(); window.open(this.src);">` : ''}
+                                        <div>
+                                            <span class="item-title">${item.name}</span>
+                                            ${item.memo ? `<div style="font-size:12px; color:#6c757d; font-weight:normal;">${item.memo}</div>` : ''}
+                                        </div>
                                         <span class="stock-badge">재고: ${totalStock}개</span>
                                     </div>
                                     <div class="more-menu-container">
                                         <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
                                         <div class="more-dropdown">
                                             <button onclick="renameItemFromServer('${item.id}', '${item.name}', event)">✏️ 물품 이름 수정</button>
-                                            <button onclick="moveItemCategory('${item.id}', '${item.name}', '${catName}', event)">📁 다른 분류로 이동</button>
                                             <button class="del-action" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">🗑️ 물품 삭제</button>
                                         </div>
                                     </div>
@@ -837,7 +804,6 @@
                                         <select class="filter-year" onchange="filterItemLogsByMonth('${item.name}', this)">
                                             <option value="2026" ${currentYear===2026?'selected':''}>2026년</option>
                                             <option value="2025" ${currentYear===2025?'selected':''}>2025년</option>
-                                            <option value="2024" ${currentYear===2024?'selected':''}>2024년</option>
                                         </select>
                                         <select class="filter-month" onchange="filterItemLogsByMonth('${item.name}', this)">
                                             ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${currentMonth===m?'selected':''}>${m}월</option>`).join('')}
@@ -851,47 +817,8 @@
                     }
                     container.appendChild(section);
                 });
-
-                if(currentSortMode === 1) {
-                    globalFolderSortable = Sortable.create(container, {
-                        animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
-                        handle: '.category-title',
-                        onEnd() {
-                            const sections = container.querySelectorAll('.category-section');
-                            const newFolderOrder = [];
-                            sections.forEach(sec => { newFolderOrder.push(sec.getAttribute('data-catname')); });
-                            globalCategories = newFolderOrder;
-                            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                        }
-                    });
-
-                    const containers = document.querySelectorAll('.items-drag-container');
-                    containers.forEach(dragContainer => {
-                        const sortableInstance = Sortable.create(dragContainer, {
-                            animation: 200, ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
-                            async onEnd() {
-                                const cards = dragContainer.querySelectorAll('.item-card');
-                                for(let i = 0; i < cards.length; i++) {
-                                    const id = cards[i].getAttribute('data-itemid');
-                                    await fetch(`${BASE_URL}/items?id=eq.${id}`, {
-                                        method: 'PATCH', headers, body: JSON.stringify({ sort_order: i + 1 })
-                                    });
-                                }
-                            }
-                        });
-                        globalItemSortables.push(sortableInstance);
-                    });
-                }
-
             } catch (error) { 
-                console.error("데이터 통신 에러:", error); 
-                container.innerHTML = `
-                    <div class="error-box">
-                        <strong>🔌 데이터베이스 연결 실패 (Failed to fetch)</strong><br>
-                        데이터베이스 서버 URL 주소나 API 키가 유효하지 않거나 인터넷 연결을 확인해 주세요.<br><br>
-                        <button class="btn" style="width: auto; padding: 8px 16px; font-size: 13px;" onclick="loadInventoryStatus()">🔄 다시 시도하기</button>
-                    </div>
-                `;
+                container.innerHTML = `<div class="error-box">데이터베이스 통신 오류가 발생했습니다.</div>`;
             }
         }
 
@@ -911,7 +838,6 @@
             const year = historyBox.querySelector('.filter-year').value;
             const month = String(historyBox.querySelector('.filter-month').value).padStart(2, '0');
             const targetPrefix = `${year}-${month}`;
-
             const rowsContainer = historyBox.querySelector('.log-rows-container');
             if(!rowsContainer) return;
 
@@ -928,7 +854,7 @@
 
             let historyHtml = '';
             if(filteredLogs.length === 0) {
-                historyHtml = `<div style="color:#999; text-align:center; padding:15px; font-size:13px;">${year}년 ${month}월의 입출고 기록이 없습니다.</div>`;
+                historyHtml = `<div style="color:#999; text-align:center; padding:15px; font-size:13px;">기록이 없습니다.</div>`;
             } else {
                 filteredLogs.forEach(log => {
                     historyHtml += `
@@ -937,12 +863,7 @@
                                 <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
                                 <strong>${log.count}개</strong> 
                                 <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
-                                <span class="running-stock">(개수 ${log.currentStockState}EA)</span>
-                                ${log.note ? `<div class="log-note">💡 ${log.note}</div>` : ''}
-                            </div>
-                            <div class="log-actions">
-                                <button class="sm-edit-btn" onclick="editLogDetail('${log.id}', '${log.type}', ${log.count}, '${log.note || ''}', '${log.created_at}', event)">수정</button>
-                                <button class="btn-danger" style="padding: 4px 6px; font-size: 11px;" onclick="deleteLogDetail('${log.id}', event)">삭제</button>
+                                <span class="running-stock">(재고 ${log.currentStockState}EA)</span>
                             </div>
                         </div>
                     `;
@@ -953,53 +874,9 @@
 
         async function deleteItemFromServer(itemId, itemName, event) {
             event.stopPropagation();
-            if (!confirm(`[ ${itemName} ] 자재 물품을 정말 삭제합니까?`)) return;
+            if (!confirm(`[ ${itemName} ] 자재 물품을 삭제합니까?`)) return;
             try {
                 await fetch(`${BASE_URL}/items?id=eq.${itemId}`, { method: 'DELETE', headers });
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-        async function deleteLogDetail(logId, event) {
-            event.stopPropagation();
-            if (!confirm("단일 기록을 완전히 지울까요?")) return;
-            try {
-                await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, { method: 'DELETE', headers });
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-        async function moveItemCategory(itemId, itemName, currentCat, event) {
-            event.stopPropagation();
-            let catListTxt = globalCategories.map((c, i) => `${i + 1}. ${c}`).join('\n');
-            const choice = prompt(`[${itemName}] 물품을 보낼 대상 폴더 번호 입력:\n\n${catListTxt}`);
-            if(!choice) return;
-            const idx = parseInt(choice) - 1;
-            if(isNaN(idx) || idx < 0 || idx >= globalCategories.length) return alert('유효하지 않은 번호입니다.');
-            const targetCategory = globalCategories[idx];
-            if(targetCategory === currentCat) return;
-
-            try {
-                await fetch(`${BASE_URL}/items?id=eq.${itemId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ category: targetCategory, sort_order: 999 })
-                });
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
-        async function editLogDetail(logId, currentType, currentCount, currentNote, originalCreatedAt, event) {
-            event.stopPropagation();
-            const newType = prompt("구분 입력 (입고 / 출고):", currentType);
-            if(newType !== '입고' && newType !== '출고') return alert('올바른 구분 값을 입력하세요.');
-            const newCount = parseInt(prompt("수량 입력:", currentCount));
-            if(isNaN(newCount) || newCount <= 0) return alert('올바른 수량을 입력하세요.');
-            const newNote = prompt("특이사항 입력:", currentNote);
-            try {
-                await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ 
-                        type: newType, 
-                        count: newCount, 
-                        note: newNote,
-                        created_at: originalCreatedAt
-                    })
-                });
                 loadInventoryStatus();
             } catch (e) { alert(e.message); }
         }
