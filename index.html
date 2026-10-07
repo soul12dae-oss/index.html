@@ -3,734 +3,328 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>자재 입출고 관리 시스템 Pro</title>
-    <!-- 엑셀 파싱 라이브러리 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
-        .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; flex-wrap: wrap; gap: 5px; }
-        .nav button { color: #cfd4da; background: none; border: none; font-size: 14px; font-weight: bold; cursor: pointer; padding: 8px; }
-        .nav button.active-btn { color: #fff; border-bottom: 2px solid #fff; }
-        .tab-content { display: none; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); max-width: 700px; margin: 0 auto; }
-        .active { display: block; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 6px; font-weight: 600; font-size: 14px; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 6px; font-size: 15px; }
-        .form-group textarea { height: 60px; resize: none; }
-        button.btn { width: 100%; padding: 14px; background: #0d6efd; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        button.btn-danger { background: #dc3545; color: white; border: none; border-radius: 6px; width: 100%; padding: 14px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        
-        .category-section { margin-bottom: 25px; background: #fdfdfd; padding: 12px; border: 1px dashed #ced4da; border-radius: 8px; position: relative; }
-        .category-title { font-size: 18px; font-weight: bold; color: #495057; border-left: 4px solid #0d6efd; padding-left: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
-        .items-drag-container { display: block; }
-        .items-drag-container.collapsed { display: none !important; }
-        .fold-icon { font-size: 14px; margin-left: 6px; color: #a0a0a0; transition: transform 0.2s; transform: rotate(0deg); }
-        .category-title.collapsed .fold-icon { transform: rotate(-90deg); }
-        
-        .more-menu-container { position: relative; display: inline-block; }
-        .more-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 4px 8px; color: #6c757d; font-weight: bold; }
-        .more-dropdown { display: none; position: absolute; top: 100%; right: 0; background: white; border: 1px solid #ced4da; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 6px; z-index: 9999; min-width: 150px; overflow: hidden; }
-        .more-dropdown.show { display: block; }
-        .more-dropdown button { width: 100%; padding: 11px 14px; border: none; background: white; text-align: left; font-size: 13px; cursor: pointer; color: #333; display: block; box-sizing: border-box; }
-        .more-dropdown button:hover { background: #f1f3f5; }
-        .more-dropdown button.del-action { color: #dc3545; }
-
-        .item-card { background: white; border: 1px solid #e9ecef; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); overflow: visible; position: relative; }
-        .item-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; background: #fff; cursor: pointer; position: relative; }
-        .item-info { display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 15px; }
-        .stock-badge { background: #e2e3e5; padding: 4px 10px; border-radius: 20px; font-size: 14px; color: #111; border: 1px solid #ced4da; font-weight: 800; }
-        
-        .history-content { display: none; background: #f8f9fa; padding: 12px; border-top: 1px solid #eee; font-size: 14px; }
-        .history-content.show { display: block; }
-        
-        .history-month-filter { display: flex; gap: 8px; background: #e9ecef; padding: 8px; border-radius: 6px; margin-bottom: 10px; align-items: center; }
-        .history-month-filter select { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; background: white; }
-        .history-month-filter label { font-size: 12px; font-weight: bold; color: #495057; }
-
-        .log-row { padding: 10px 4px; border-bottom: 1px dashed #dee2e6; display: flex; justify-content: space-between; align-items: center; }
-        .log-row:last-child { border-bottom: none; }
-        .log-actions { display: flex; gap: 5px; align-items: center; }
-        .sm-edit-btn { background: #e9ecef; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; color: #495057; }
-        .running-stock { font-size: 12px; color: #6c757d; font-weight: normal; margin-left: 6px; }
-        
-        .top-action-bar { display: flex; flex-wrap: wrap; justify-content: flex-end; margin-bottom: 15px; gap: 8px; }
-        .add-cat-btn { background: #198754; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        .excel-btn { background: #0ea5e9; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-        .print-btn { background: #6c757d; color: white; border: none; padding: 10px 14px; border-radius: 6px; font-weight: bold; font-size: 14px; cursor: pointer; }
-
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 10000; justify-content: center; align-items: center; }
-        .modal-content { background: white; padding: 25px; border-radius: 10px; max-width: 500px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
-        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
-
-        .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
-        .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-        .notepad-title { font-size: 18px; font-weight: bold; color: #202020; }
-        .add-note-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #555; padding: 0 10px; line-height: 1; }
-        .note-search-box { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: #fff; }
-        .notes-list { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; max-height: 500px; padding-right: 5px; }
-        
-        .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; }
-        .note-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-        .note-date { font-size: 11px; color: #8c824b; font-weight: 500; }
-        .delete-note-btn { background: none; border: none; font-size: 14px; color: #8c824b; cursor: pointer; font-weight: bold; }
-        .note-input-title { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: bold; color: #222; outline: none; padding: 0; margin-bottom: 2px; }
-        .note-input-content { width: 100%; border: none; background: transparent; font-size: 14px; color: #333; outline: none; resize: none; padding: 0; line-height: 1.4; height: 60px; font-family: inherit; }
-
-        .item-image-preview { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid #ced4da; cursor: pointer; }
-        .error-box { background: #fff3f2; border: 1px solid #f8d7da; border-radius: 8px; padding: 20px; text-align: center; color: #842029; font-size: 14px; }
-    </style>
+    <title>자재 입출고 관리 시스템</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-<body>
+<body class="bg-gray-100 min-h-screen">
 
-    <div class="nav">
-        <button id="btn-main" onclick="openTab('main')">메인(등록)</button>
-        <button id="btn-notepad" onclick="openTab('notepad')">실시간 공유 메모장</button>
-        <button id="btn-inflow" onclick="openTab('inflow')">입고</button>
-        <button id="btn-outflow" onclick="openTab('outflow')">출고</button>
-        <button id="btn-status" class="active-btn" onclick="openTab('status')">전체현황</button>
-    </div>
+    <div class="container mx-auto px-4 py-6">
+        <!-- 상단 네비게이션 탭 -->
+        <div class="flex space-x-2 border-b border-gray-300 pb-3 mb-6 overflow-x-auto">
+            <button onclick="switchTab('main')" id="tab-main" class="tab-btn px-4 py-2 bg-blue-600 text-white rounded-lg font-medium shadow">메인</button>
+            <button onclick="switchTab('photos')" id="tab-photos" class="tab-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">사진폴더</button>
+            <button onclick="switchTab('notes')" id="tab-notes" class="tab-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">실시간 메모장</button>
+            <button onclick="switchTab('inbound')" id="tab-inbound" class="tab-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">입고</button>
+            <button onclick="switchTab('outbound')" id="tab-outbound" class="tab-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">출고</button>
+            <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300">전체현황</button>
+        </div>
 
-    <!-- 1. 메인 화면 -->
-    <div id="main" class="tab-content">
-        <h2>물품 등록</h2>
-        <div class="form-group">
-            <label>분류 (폴더 선택 및 생성)</label>
-            <select id="itemCategorySelect" onchange="checkNewCategory(this)"></select>
-            <input type="text" id="newCategoryInput" style="display:none; margin-top:8px;" placeholder="새로운 분류 이름을 입력하세요">
-        </div>
-        <div class="form-group">
-            <label>물품명</label>
-            <input type="text" id="itemName" placeholder="예: A형 볼트">
-        </div>
-        <div class="form-group">
-            <label>기타 메모</label>
-            <input type="text" id="itemMemo" placeholder="규격, 제조사 등">
-        </div>
-        <button class="btn" onclick="addItem()">물품 등록하기</button>
-    </div>
-
-    <!-- 2. 공유 스티커 메모장 화면 -->
-    <div id="notepad" class="tab-content">
-        <div class="notepad-container">
-            <div class="notepad-header">
-                <button class="add-note-btn" onclick="addNewNote()">+</button>
-                <div class="notepad-title">실시간 공유 스티커 메모</div>
-                <div style="width:24px;"></div>
+        <!-- 1. 메인 탭 -->
+        <div id="content-main" class="tab-content">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">환영합니다!</h2>
+                <p class="text-gray-600">자재 입출고 관리 및 실시간 공유 메모, 사진함 기능을 이용하실 수 있습니다.</p>
             </div>
-            <input type="text" class="note-search-box" id="noteSearch" oninput="renderNotes()" placeholder="검색...">
-            <div class="notes-list" id="notesList">메모 로딩 중...</div>
         </div>
-    </div>
 
-    <!-- 3. 입고 화면 -->
-    <div id="inflow" class="tab-content">
-        <h2>자재 입고</h2>
-        <div class="form-group">
-            <label>물품 선택</label>
-            <select id="inItemSelect"><option value="">로딩 중...</option></select>
-        </div>
-        <div class="form-group">
-            <label>입고 수량</label>
-            <input type="number" id="inCount" min="1" placeholder="숫자만 입력">
-        </div>
-        <div class="form-group">
-            <label>특이사항</label>
-            <textarea id="inNote" placeholder="특이사항 입력 (생략 가능)"></textarea>
-        </div>
-        <button class="btn" onclick="logStock('입고')">입고 완료</button>
-    </div>
+        <!-- 2. 사진폴더 탭 -->
+        <div id="content-photos" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <!-- 좌측: 폴더 관리 -->
+                <div class="bg-white p-4 rounded-xl shadow-md md:col-span-1">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">폴더 목록</h3>
+                    <div class="flex mb-4">
+                        <input type="text" id="new-folder-name" placeholder="새 폴더 이름" class="flex-1 border rounded-l-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button onclick="createFolder()" class="bg-blue-600 text-white px-3 py-2 rounded-r-lg text-sm hover:bg-blue-700">생성</button>
+                    </div>
+                    <div id="folder-list" class="space-y-2 max-h-[500px] overflow-y-auto">
+                        <!-- 폴더 목록 동적 생성 -->
+                    </div>
+                </div>
 
-    <!-- 4. 출고 화면 -->
-    <div id="outflow" class="tab-content">
-        <h2>자재 출고</h2>
-        <div class="form-group">
-            <label>물품 선택</label>
-            <select id="outItemSelect"><option value="">로딩 중...</option></select>
-        </div>
-        <div class="form-group">
-            <label>출고 수량</label>
-            <input type="number" id="outCount" min="1" placeholder="숫자만 입력">
-        </div>
-        <div class="form-group">
-            <label>특이사항</label>
-            <textarea id="outNote" placeholder="특이사항 입력 (생략 가능)"></textarea>
-        </div>
-        <button class="btn btn-danger" onclick="logStock('출고')">출고 완료</button>
-    </div>
-
-    <!-- 5. 전체 현황 화면 -->
-    <div id="status" class="tab-content active">
-        <h2>전체 현황판</h2>
-        <div class="top-action-bar">
-            <button class="excel-btn" onclick="toggleExcelModal(true)">📊 엑셀 일괄 업로드</button>
-            <button class="print-btn" onclick="window.print()">🖨️ 인쇄</button>
-            <button class="add-cat-btn" onclick="createNewCategoryFromStatus()">+ 새 분류 폴더 만들기</button>
-        </div>
-        <div id="itemStatusList">데이터를 불러오는 중...</div>
-    </div>
-
-    <!-- 엑셀 파일 업로드 팝업 모달 -->
-    <div id="excelModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span>📊 시트이름별 자동 분류 업로드</span>
-                <button class="modal-close" onclick="toggleExcelModal(false)">✕</button>
+                <!-- 우측: 사진 관리 -->
+                <div class="bg-white p-6 rounded-xl shadow-md md:col-span-3">
+                    <div class="flex justify-between items-center mb-4 pb-2 border-b">
+                        <h3 id="current-folder-title" class="text-xl font-bold text-gray-800">폴더를 선택해주세요</h3>
+                        <div id="photo-upload-area" class="hidden flex items-center space-x-2">
+                            <input type="file" id="photo-file-input" accept="image/*" class="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <button onclick="uploadPhoto()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 shadow">사진 업로드</button>
+                        </div>
+                    </div>
+                    <div id="photo-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <p class="text-gray-500 col-span-full text-center py-10">좌측에서 폴더를 선택하면 사진이 표시됩니다.</p>
+                    </div>
+                </div>
             </div>
-            <div class="form-group" style="margin-top: 10px;">
-                <label>엑셀 파일(.xlsx) 선택</label>
-                <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="padding: 12px; border: 1px dashed #aaa; background: #fafafa; width:100%; box-sizing:border-box;">
+        </div>
+
+        <!-- 3. 실시간 메모장 탭 -->
+        <div id="content-notes" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">실시간 공유 메모장</h2>
+                <div class="mb-4">
+                    <input type="text" id="note-title" placeholder="메모 제목" class="w-full border rounded-lg px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <textarea id="note-content" placeholder="내용을 입력하세요..." rows="3" class="w-full border rounded-lg px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    <button onclick="saveNote()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow">메모 저장</button>
+                </div>
+                <div id="notes-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                    <!-- 메모 목록 동적 생성 -->
+                </div>
             </div>
-            <button class="btn" style="background:#198754; margin-top: 15px;" onclick="uploadExcelData()">🚀 업로드 시작</button>
+        </div>
+
+        <!-- 4. 입고 탭 -->
+        <div id="content-inbound" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">자재 입고 관리</h2>
+                <p class="text-gray-600">입고 기능 영역입니다.</p>
+            </div>
+        </div>
+
+        <!-- 5. 출고 탭 -->
+        <div id="content-outbound" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">자재 출고 관리</h2>
+                <p class="text-gray-600">출고 기능 영역입니다.</p>
+            </div>
+        </div>
+
+        <!-- 6. 전체현황 탭 -->
+        <div id="content-overview" class="tab-content hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">전체 재고 현황</h2>
+                <p class="text-gray-600">전체현황 영역입니다.</p>
+            </div>
         </div>
     </div>
 
+    <!-- 스크립트 로직 -->
     <script>
-        const BASE_URL = "https://kvfdfdcaidsdnohfcbeg.supabase.co/rest/v1";
-        const API_KEY = "sb_publishable_AzZQ-7pqFS2klriLNXlCig_xRs8b1vV";
+        // Supabase 설정 (본인의 Supabase URL과 Anon Key를 입력하세요)
+        const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+        const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const headers = {
-            "apikey": API_KEY,
-            "Authorization": `Bearer ${API_KEY}`,
-            "Content-Type": "application/json",
-            "Prefer": "return=representation"
-        };
+        let currentFolderId = null;
+        let currentFolderName = '';
 
-        let globalCategories = [];
-        let stickyNotes = [];
-        let latestRawItems = [];
-        let globalLogsData = [];
-        let collapsedFolders = {}; 
-
-        function openTab(tabId) {
-            try {
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active-btn'));
-                
-                const targetTab = document.getElementById(tabId);
-                const targetBtn = document.getElementById(`btn-${tabId}`);
-                
-                if (targetTab) targetTab.classList.add('active');
-                if (targetBtn) targetBtn.classList.add('active-btn');
-                
-                if(tabId === 'main') loadCategories();
-                if(tabId === 'status') loadInventoryStatus();
-                if(tabId === 'inflow' || tabId === 'outflow') loadItems();
-                if(tabId === 'notepad') loadSharedNotes();
-            } catch (err) { console.error(err); }
-        }
-
-        window.onload = function() {
-            try {
-                const savedCatOrder = localStorage.getItem('system_category_order');
-                if (savedCatOrder) globalCategories = JSON.parse(savedCatOrder);
-                
-                loadItems();
-                loadCategories();
-                loadInventoryStatus();
-            } catch(e) { console.error(e); }
-            
-            window.addEventListener('click', function(e) {
-                if(!e.target.classList.contains('more-btn')) {
-                    document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
-                }
+        // 탭 전환 함수
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-blue-600', 'text-white', 'shadow');
+                el.classList.add('bg-gray-200', 'text-gray-700');
             });
-        };
 
-        function getFormattedDate() {
-            const now = new Date();
-            return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tabName}`);
+            activeBtn.classList.remove('bg-gray-200', 'text-gray-700');
+            activeBtn.classList.add('bg-blue-600', 'text-white', 'shadow');
+
+            if (tabName === 'notes') loadNotes();
+            if (tabName === 'photos') loadFolders();
         }
 
-        function normalizeCategory(cat) {
-            if(!cat || String(cat).trim() === '' || String(cat).trim() === 'null') return '미지정분류';
-            return String(cat).trim();
+        // --- 메모장 관련 함수 ---
+        async function saveNote() {
+            const title = document.getElementById('note-title').value;
+            const content = document.getElementById('note-content').value;
+            if (!title || !content) return alert('제목과 내용을 모두 입력해주세요.');
+
+            const { error } = await supabase.from('shared_notes').insert([{ title, content, date: new Date().toISOString().split('T')[0] }]);
+            if (error) {
+                alert('저장 실패: ' + error.message);
+            } else {
+                document.getElementById('note-title').value = '';
+                document.getElementById('note-content').value = '';
+                loadNotes();
+            }
         }
 
-        async function loadCategories() {
-            try {
-                const response = await fetch(`${BASE_URL}/items?select=category`, { headers });
-                if(!response.ok) return;
-                const data = await response.json();
-                const dbCats = Array.isArray(data) ? data.map(item => normalizeCategory(item.category)) : [];
-                const uniqueCats = [...new Set(dbCats)];
-                
-                uniqueCats.forEach(c => {
-                    if(!globalCategories.includes(c)) globalCategories.push(c);
-                });
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                
-                const select = document.getElementById('itemCategorySelect');
-                if(!select) return;
-                let options = '';
-                globalCategories.forEach(cat => { options += `<option value="${cat}">${cat}</option>`; });
-                options += `<option value="__NEW__">+ 새 분류 폴더 만들기...</option>`;
-                select.innerHTML = options;
-                document.getElementById('newCategoryInput').style.display = 'none';
-            } catch (e) { console.error(e); }
-        }
+        async function loadNotes() {
+            const { data, error } = await supabase.from('shared_notes').select('*').order('created_at', { ascending: false });
+            const listEl = document.getElementById('notes-list');
+            if (error) { listEl.innerHTML = '<p class="text-red-500">메모를 불러오지 못했습니다.</p>'; return; }
 
-        function checkNewCategory(select) {
-            const input = document.getElementById('newCategoryInput');
-            if(select.value === '__NEW__') { input.style.display = 'block'; input.focus(); } 
-            else { input.style.display = 'none'; }
-        }
-
-        async function createNewCategoryFromStatus() {
-            const newCatName = prompt('새로 만들 분류 폴더 이름을 지정하세요:');
-            if(!newCatName || newCatName.trim() === '') return;
-            const target = normalizeCategory(newCatName);
-            if(globalCategories.includes(target)) return alert('이미 존재하는 분류입니다.');
-            
-            globalCategories.push(target);
-            localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-            loadInventoryStatus();
-        }
-
-        async function renameCategoryFromStatus(oldCatName, event) {
-            event.stopPropagation();
-            const newCatName = prompt(`새 이름을 입력하세요:`, oldCatName);
-            if(!newCatName || newCatName.trim() === '' || newCatName === oldCatName) return;
-            const normalizedNew = normalizeCategory(newCatName);
-            try {
-                await fetch(`${BASE_URL}/items?category=eq.${oldCatName}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ category: normalizedNew })
-                });
-                const idx = globalCategories.indexOf(oldCatName);
-                if(idx !== -1) globalCategories[idx] = normalizedNew;
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
-
-        async function deleteCategoryFromStatus(catName, event) {
-            event.stopPropagation();
-            if(!confirm(`[${catName}] 폴더와 하위 모든 물품을 삭제하시겠습니까?`)) return;
-            try {
-                await fetch(`${BASE_URL}/items?category=eq.${catName}`, { method: 'DELETE', headers });
-                globalCategories = globalCategories.filter(c => c !== catName);
-                localStorage.setItem('system_category_order', JSON.stringify(globalCategories));
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
-
-        async function loadSharedNotes() {
-            try {
-                const res = await fetch(`${BASE_URL}/shared_notes?select=*&order=id.desc`, { headers });
-                if(res.ok) {
-                    stickyNotes = await res.json();
-                    renderNotes();
-                }
-            } catch(e) { console.error(e); }
-        }
-
-        async function addNewNote() {
-            try {
-                await fetch(`${BASE_URL}/shared_notes`, {
-                    method: 'POST', headers, body: JSON.stringify({ title: '', content: '', date: getFormattedDate() })
-                });
-                loadSharedNotes();
-            } catch(e) { alert(e.message); }
-        }
-
-        async function updateNote(id, field, value) {
-            try {
-                await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, {
-                    method: 'PATCH', headers, body: JSON.stringify({ [field]: value })
-                });
-            } catch(e) { console.error(e); }
+            listEl.innerHTML = data.map(note => `
+                <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg shadow-sm relative">
+                    <h3 class="font-bold text-gray-800">${note.title}</h3>
+                    <p class="text-gray-600 mt-1 whitespace-pre-wrap text-sm">${note.content}</p>
+                    <span class="block text-xs text-gray-400 mt-3">${note.date || ''}</span>
+                    <button onclick="deleteNote(${note.id})" class="absolute top-2 right-2 text-red-400 hover:text-red-600 text-xs">삭제</button>
+                </div>
+            `).join('');
         }
 
         async function deleteNote(id) {
-            if(!confirm('메모를 삭제하시겠습니까?')) return;
-            try {
-                await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, { method: 'DELETE', headers });
-                loadSharedNotes();
-            } catch(e) { alert(e.message); }
+            if (!confirm('메모를 삭제하시겠습니까?')) return;
+            await supabase.from('shared_notes').delete().eq('id', id);
+            loadNotes();
         }
 
-        function renderNotes() {
-            const listContainer = document.getElementById('notesList');
-            const keyword = document.getElementById('noteSearch').value.toLowerCase().trim();
-            if(!listContainer) return;
-            listContainer.innerHTML = '';
-            
-            const filteredNotes = stickyNotes.filter(note => (note.title || '').toLowerCase().includes(keyword) || (note.content || '').toLowerCase().includes(keyword));
-            filteredNotes.forEach(note => {
-                const card = document.createElement('div');
-                card.className = 'note-card';
-                card.innerHTML = `
-                    <div class="note-card-header">
-                        <span class="note-date">${note.date || ''}</span>
-                        <button class="delete-note-btn" onclick="deleteNote(${note.id})">✕</button>
+        // --- 사진폴더 관련 함수 ---
+        async function loadFolders() {
+            const { data, error } = await supabase.from('photo_folders').select('*').order('created_at', { ascending: true });
+            const listEl = document.getElementById('folder-list');
+            if (error) return;
+
+            if (!data || data.length === 0) {
+                listEl.innerHTML = '<p class="text-xs text-gray-400">생성된 폴더가 없습니다.</p>';
+                return;
+            }
+
+            listEl.innerHTML = data.map(folder => `
+                <div onclick="selectFolder(${folder.id}, '${folder.name}')" class="flex justify-between items-center p-2 rounded-lg cursor-pointer hover:bg-blue-50 border ${currentFolderId === folder.id ? 'bg-blue-100 border-blue-400 font-bold' : 'border-gray-200'}">
+                    <span class="text-sm truncate flex-1">${folder.name}</span>
+                    <div class="space-x-1">
+                        <button onclick="event.stopPropagation(); renameFolder(${folder.id}, '${folder.name}')" class="text-xs text-gray-500 hover:text-blue-600 px-1">수정</button>
+                        <button onclick="event.stopPropagation(); deleteFolder(${folder.id})" class="text-xs text-red-400 hover:text-red-600 px-1">삭제</button>
                     </div>
-                    <input type="text" class="note-input-title" placeholder="제목" value="${note.title || ''}" oninput="updateNote(${note.id}, 'title', this.value)">
-                    <textarea class="note-input-content" placeholder="내용..." oninput="updateNote(${note.id}, 'content', this.value)">${note.content || ''}</textarea>
-                `;
-                listContainer.appendChild(card);
-            });
+                </div>
+            `).join('');
         }
 
-        async function loadItems() {
-            try {
-                const response = await fetch(`${BASE_URL}/items?select=name&order=sort_order.asc`, { headers });
-                if(!response.ok) return;
-                const data = await response.json();
-                let options = '<option value="">물품을 선택하세요</option>';
-                if(Array.isArray(data)){
-                    data.forEach(item => { if(item && item.name) options += `<option value="${item.name}">${item.name}</option>`; });
-                }
-                if(document.getElementById('inItemSelect')) document.getElementById('inItemSelect').innerHTML = options;
-                if(document.getElementById('outItemSelect')) document.getElementById('outItemSelect').innerHTML = options;
-            } catch (error) { console.error(error); }
-        }
+        async function createFolder() {
+            const nameInput = document.getElementById('new-folder-name');
+            const name = nameInput.value.trim();
+            if (!name) return alert('폴더 이름을 입력해주세요.');
 
-        async function addItem() {
-            const select = document.getElementById('itemCategorySelect');
-            const newInput = document.getElementById('newCategoryInput');
-            let category = select.value;
-            if(category === '__NEW__') {
-                category = newInput.value.trim();
-                if(!category) return alert('새로운 분류 명칭을 입력해 주세요.');
+            const { error } = await supabase.from('photo_folders').insert([{ name }]);
+            if (error) {
+                alert('폴더 생성 실패: ' + error.message);
+            } else {
+                nameInput.value = '';
+                loadFolders();
             }
-            category = normalizeCategory(category);
-            const name = document.getElementById('itemName').value.trim();
-            const memo = document.getElementById('itemMemo').value.trim();
-            
-            if(!name) return alert('물품명을 입력해주세요.');
-
-            try {
-                const countRes = await fetch(`${BASE_URL}/items?select=id`, { headers });
-                const countData = await countRes.json();
-                const nextOrder = (countData ? countData.length : 0) + 1;
-
-                await fetch(`${BASE_URL}/items`, {
-                    method: 'POST', headers,
-                    body: JSON.stringify({ name, memo, category, sort_order: nextOrder })
-                });
-                alert(`[${category} > ${name}] 등록 완료!`);
-                document.getElementById('itemName').value = '';
-                document.getElementById('itemMemo').value = '';
-                newInput.value = '';
-                loadCategories();
-            } catch (error) { alert("오류: " + error.message); }
         }
 
-        async function logStock(type) {
-            const prefix = type === '입고' ? 'in' : 'out';
-            const itemName = document.getElementById(`${prefix}ItemSelect`).value;
-            const count = parseInt(document.getElementById(`${prefix}Count`).value);
-            const note = document.getElementById(`${prefix}Note`).value.trim();
-            if(!itemName) return alert('물품을 선택하세요.');
-            if(!count || count <= 0) return alert('수량을 입력하세요.');
+        async function renameFolder(id, oldName) {
+            const newName = prompt('변경할 폴더 이름을 입력하세요:', oldName);
+            if (!newName || newName.trim() === '' || newName === oldName) return;
 
-            try {
-                await fetch(`${BASE_URL}/stock_logs`, {
-                    method: 'POST', headers,
-                    body: JSON.stringify({ type, item_name: itemName, count, note })
-                });
-                alert(`${itemName} ${count}개 ${type} 완료!`);
-                document.getElementById(`${prefix}Count`).value = '';
-                document.getElementById(`${prefix}Note`).value = '';
-            } catch (error) { alert(error.message); }
+            const { error } = await supabase.from('photo_folders').update({ name: newName.trim() }).eq('id', id);
+            if (error) {
+                alert('이름 변경 실패: ' + error.message);
+            } else {
+                loadFolders();
+                if (currentFolderId === id) {
+                    currentFolderName = newName.trim();
+                    document.getElementById('current-folder-title').innerText = currentFolderName;
+                }
+            }
         }
 
-        function toggleMoreMenu(event) {
-            event.stopPropagation();
-            const btn = event.currentTarget;
-            const dropdown = btn.nextElementSibling;
-            const isOpen = dropdown.classList.contains('show');
-            document.querySelectorAll('.more-dropdown').forEach(d => d.classList.remove('show'));
-            if(!isOpen && dropdown) dropdown.classList.add('show');
+        async function deleteFolder(id) {
+            if (!confirm('폴더를 삭제하시겠습니까? 안의 사진들도 함께 삭제됩니다.')) return;
+            const { error } = await supabase.from('photo_folders').delete().eq('id', id);
+            if (error) {
+                alert('삭제 실패: ' + error.message);
+            } else {
+                if (currentFolderId === id) {
+                    currentFolderId = null;
+                    document.getElementById('current-folder-title').innerText = '폴더를 선택해주세요';
+                    document.getElementById('photo-upload-area').classList.add('hidden');
+                    document.getElementById('photo-grid').innerHTML = '<p class="text-gray-500 col-span-full text-center py-10">좌측에서 폴더를 선택하면 사진이 표시됩니다.</p>';
+                }
+                loadFolders();
+            }
         }
 
-        function toggleExcelModal(show) {
-            const modal = document.getElementById('excelModal');
-            if(show) modal.style.display = 'flex';
-            else { modal.style.display = 'none'; document.getElementById('excelFileInput').value = ''; }
+        function selectFolder(id, name) {
+            currentFolderId = id;
+            currentFolderName = name;
+            document.getElementById('current-folder-title').innerText = `📂 ${name}`;
+            document.getElementById('photo-upload-area').classList.remove('hidden');
+            loadFolders();
+            loadPhotos();
         }
 
-        function uploadExcelData() {
-            const fileInput = document.getElementById('excelFileInput');
-            if(fileInput.files.length === 0) return alert('엑셀 파일을 선택하세요.');
+        async function uploadPhoto() {
+            const fileInput = document.getElementById('photo-file-input');
             const file = fileInput.files[0];
-            const reader = new FileReader();
+            if (!file) return alert('업로드할 사진을 선택해주세요.');
 
-            reader.onload = async function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const allInsertItems = [];
+            const fileName = `${Date.now()}_${file.name}`;
+            const filePath = `photos/${fileName}`;
 
-                    for (let sheetName of workbook.SheetNames) {
-                        const worksheet = workbook.Sheets[sheetName];
-                        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        let headerIndex = -1;
-                        for(let i=0; i<rows.length; i++) {
-                            if(rows[i] && (rows[i].includes('품 명') || rows[i].includes('품명'))) { headerIndex = i; break; }
-                        }
-                        if(headerIndex === -1) continue;
-                        const headersRow = rows[headerIndex];
-                        const nameIdx = headersRow.findIndex(h => h === '품 명' || h === '품명');
+            // 1. Supabase Storage에 파일 업로드
+            const { data: storageData, error: storageError } = await supabase.storage.from('photo_folder').upload(filePath, file);
+            if (storageError) {
+                alert('파일 업로드 실패: ' + storageError.message);
+                return;
+            }
 
-                        for(let i = headerIndex + 1; i < rows.length; i++) {
-                            const row = rows[i];
-                            if(!row || row.length === 0) continue;
-                            let pName = row[nameIdx] ? String(row[nameIdx]).trim() : '';
-                            if(!pName || pName === '품 명') continue;
+            // 2. 공개 URL 가져오기
+            const { data: publicUrlData } = supabase.storage.from('photo_folder').getPublicUrl(filePath);
+            const publicUrl = publicUrlData.publicUrl;
 
-                            allInsertItems.push({ name: pName, category: normalizeCategory(sheetName), memo: '', sort_order: 999 });
-                        }
-                    }
+            // 3. DB에 사진 정보 저장
+            const { error: dbError } = await supabase.from('photos').insert([{
+                folder_id: currentFolderId,
+                title: file.name,
+                file_path: publicUrl
+            }]);
 
-                    if(allInsertItems.length === 0) return alert('유효한 데이터가 없습니다.');
-                    await fetch(`${BASE_URL}/items`, { method: 'POST', headers, body: JSON.stringify(allInsertItems) });
-                    alert(`총 ${allInsertItems.length}개 품목 일괄 저장 완료!`);
-                    toggleExcelModal(false);
-                    loadInventoryStatus();
-                } catch (err) { alert('오류: ' + err.message); }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
-        function toggleFolder(catName) {
-            const container = document.getElementById(`folder-container-${catName}`);
-            if(!container) return;
-            const titleEl = container.previousElementSibling;
-            if(container.classList.contains('collapsed')) {
-                container.classList.remove('collapsed');
-                if(titleEl) titleEl.classList.remove('collapsed');
-                collapsedFolders[catName] = false;
+            if (dbError) {
+                alert('사진 정보 저장 실패: ' + dbError.message);
             } else {
-                container.classList.add('collapsed');
-                if(titleEl) titleEl.classList.add('collapsed');
-                collapsedFolders[catName] = true;
+                fileInput.value = '';
+                loadPhotos();
             }
         }
 
-        async function renameItemFromServer(itemId, oldItemName, event) {
-            event.stopPropagation();
-            const newItemName = prompt(`새로운 이름을 입력하세요:`, oldItemName);
-            if(!newItemName || newItemName.trim() === '' || newItemName.trim() === oldItemName) return;
-            const targetName = newItemName.trim();
-            try {
-                await fetch(`${BASE_URL}/items?id=eq.${itemId}`, { method: 'PATCH', headers, body: JSON.stringify({ name: targetName }) });
-                await fetch(`${BASE_URL}/stock_logs?item_name=eq.${oldItemName}`, { method: 'PATCH', headers, body: JSON.stringify({ item_name: targetName }) });
-                loadInventoryStatus();
-            } catch(e) { alert(e.message); }
-        }
+        async function loadPhotos() {
+            if (!currentFolderId) return;
+            const { data, error } = await supabase.from('photos').select('*').eq('folder_id', currentFolderId).order('created_at', { ascending: false });
+            const gridEl = document.getElementById('photo-grid');
+            if (error) { gridEl.innerHTML = '<p class="text-red-500">사진을 불러오지 못했습니다.</p>'; return; }
 
-        async function deleteItemFromServer(itemId, itemName, event) {
-            event.stopPropagation();
-            if (!confirm(`[ ${itemName} ] 물품을 삭제합니까?`)) return;
-            try {
-                await fetch(`${BASE_URL}/items?id=eq.${itemId}`, { method: 'DELETE', headers });
-                loadInventoryStatus();
-            } catch (e) { alert(e.message); }
-        }
-
-        async function editStockLog(logId, currentCount, currentNote) {
-            const newCountStr = prompt('수정할 수량을 입력하세요:', currentCount);
-            if(newCountStr === null) return;
-            const newCount = parseInt(newCountStr);
-            if(isNaN(newCount) || newCount <= 0) return alert('올바른 숫자를 입력해주세요.');
-
-            const newNote = prompt('수정할 특이사항을 입력하세요:', currentNote || '');
-            if(newNote === null) return;
-
-            try {
-                await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, {
-                    method: 'PATCH',
-                    headers,
-                    body: JSON.stringify({ count: newCount, note: newNote })
-                });
-                alert('기록이 수정되었습니다.');
-                loadInventoryStatus();
-            } catch(e) { alert('수정 오류: ' + e.message); }
-        }
-
-        async function deleteStockLog(logId) {
-            if(!confirm('이 입출고 기록을 삭제하시겠습니까? (재고 수량에 반영됩니다)')) return;
-            try {
-                await fetch(`${BASE_URL}/stock_logs?id=eq.${logId}`, { method: 'DELETE', headers });
-                loadInventoryStatus();
-            } catch(e) { alert('삭제 오류: ' + e.message); }
-        }
-
-        function formatDateFull(isoString) {
-            if(!isoString) return "-";
-            const d = new Date(isoString);
-            if(isNaN(d.getTime())) return "-";
-            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        }
-
-        async function loadInventoryStatus() {
-            const container = document.getElementById('itemStatusList');
-            if(!container) return;
-
-            try {
-                const itemRes = await fetch(`${BASE_URL}/items?select=*&order=sort_order.asc`, { headers });
-                if (!itemRes.ok) throw new Error();
-                const itemsData = await itemRes.json();
-                latestRawItems = itemsData;
-
-                const logRes = await fetch(`${BASE_URL}/stock_logs?select=*&order=created_at.asc`, { headers });
-                globalLogsData = logRes.ok ? await logRes.json() : [];
-
-                container.innerHTML = '';
-                itemsData.forEach(item => { item.category = normalizeCategory(item.category); });
-                const activeDbCategories = itemsData.map(item => item.category);
-                
-                let allCategories = [...globalCategories];
-                activeDbCategories.forEach(c => { if(!allCategories.includes(c)) allCategories.push(c); });
-
-                if (allCategories.length === 0) {
-                    container.innerHTML = `<div style="text-align:center; padding:40px; color:#888;">등록된 물품이 없습니다.</div>`;
-                    return;
-                }
-
-                const groups = {};
-                allCategories.forEach(c => groups[c] = []);
-                itemsData.forEach(item => { if(groups[item.category]) groups[item.category].push(item); });
-
-                allCategories.forEach(catName => {
-                    const matchedItems = groups[catName] || [];
-                    const section = document.createElement('div');
-                    section.className = 'category-section';
-                    
-                    if (collapsedFolders[catName] === undefined) collapsedFolders[catName] = true;
-                    const isCollapsed = collapsedFolders[catName];
-
-                    section.innerHTML = `
-                        <div class="category-title ${isCollapsed ? 'collapsed' : ''}" onclick="toggleFolder('${catName}')">
-                            <div>📁 ${catName} <span style="font-size:12px; font-weight:normal; color:#888;">(${matchedItems.length}개)</span><span class="fold-icon">▼</span></div>
-                            <div class="more-menu-container">
-                                <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
-                                <div class="more-dropdown">
-                                    <button onclick="renameCategoryFromStatus('${catName}', event)">✏️ 폴더 이름 수정</button>
-                                    <button class="del-action" onclick="deleteCategoryFromStatus('${catName}', event)">🗑️ 분류 전체삭제</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div id="folder-container-${catName}" class="items-drag-container ${isCollapsed ? 'collapsed' : ''}"></div>
-                    `;
-
-                    const dragContainer = section.querySelector('.items-drag-container');
-
-                    if(matchedItems.length === 0) {
-                        dragContainer.innerHTML = `<div style="color:#bbb; font-size:13px; text-align:center; padding:10px;">비어있습니다.</div>`;
-                    } else {
-                        matchedItems.forEach(item => {
-                            const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === item.name) : [];
-                            let totalStock = 0;
-                            itemLogs.forEach(l => {
-                                if(l.type === '입고') totalStock += (l.count || 0);
-                                if(l.type === '출고') totalStock -= (l.count || 0);
-                            });
-
-                            const card = document.createElement('div');
-                            card.className = 'item-card';
-                            
-                            const now = new Date();
-                            const currentYear = now.getFullYear();
-                            const currentMonth = now.getMonth() + 1;
-
-                            card.innerHTML = `
-                                <div class="item-header" onclick="toggleHistory(this, '${item.name}')">
-                                    <div class="item-info">
-                                        <div>
-                                            <span class="item-title">${item.name}</span>
-                                            ${item.memo ? `<div style="font-size:12px; color:#6c757d; font-weight:normal;">${item.memo}</div>` : ''}
-                                        </div>
-                                        <span class="stock-badge">재고: ${totalStock}개</span>
-                                    </div>
-                                    <div class="more-menu-container">
-                                        <button class="more-btn" onclick="toggleMoreMenu(event)">⋮</button>
-                                        <div class="more-dropdown">
-                                            <button onclick="renameItemFromServer('${item.id}', '${item.name}', event)">✏ 물품 이름 수정</button>
-                                            <button class="del-action" onclick="deleteItemFromServer('${item.id}', '${item.name}', event)">🗑️ 물품 삭제</button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="history-content">
-                                    <div class="history-month-filter" onclick="event.stopPropagation();">
-                                        <label>조회 기간:</label>
-                                        <select class="filter-year" onchange="filterItemLogsByMonth('${item.name}', this)">
-                                            <option value="2026" ${currentYear===2026?'selected':''}>2026년</option>
-                                            <option value="2025" ${currentYear===2025?'selected':''}>2025년</option>
-                                        </select>
-                                        <select class="filter-month" onchange="filterItemLogsByMonth('${item.name}', this)">
-                                            ${[1,2,3,4,5,6,7,8,9,10,11,12].map(m => `<option value="${m}" ${currentMonth===m?'selected':''}>${m}월</option>`).join('')}
-                                        </select>
-                                    </div>
-                                    <div class="log-rows-container"></div>
-                                </div>
-                            `;
-                            dragContainer.appendChild(card);
-                        });
-                    }
-                    container.appendChild(section);
-                });
-            } catch (error) { 
-                container.innerHTML = `<div class="error-box">데이터를 불러오는 중 오류가 발생했습니다.</div>`;
+            if (!data || data.length === 0) {
+                gridEl.innerHTML = '<p class="text-gray-400 col-span-full text-center py-10">등록된 사진이 없습니다.</p>';
+                return;
             }
+
+            // 폴더 이동을 위한 전체 폴더 목록 미리 조회
+            const { data: folders } = await supabase.from('photo_folders').select('*');
+
+            gridEl.innerHTML = data.map(photo => `
+                <div class="bg-gray-50 border rounded-lg p-2 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <img src="${photo.file_path}" alt="${photo.title}" class="w-full h-32 object-cover rounded-md mb-2 cursor-pointer" onclick="window.open('${photo.file_path}', '_blank')">
+                        <p class="text-xs text-gray-700 truncate font-medium">${photo.title}</p>
+                    </div>
+                    <div class="mt-2 flex justify-between items-center text-xs">
+                        <select onchange="movePhoto(${photo.id}, this.value)" class="border rounded px-1 py-1 bg-white text-gray-600">
+                            <option value="">폴더 이동</option>
+                            ${folders.filter(f => f.id !== currentFolderId).map(f => `<option value="${f.id}">${f.name}</option>`).join('')}
+                        </select>
+                        <button onclick="deletePhoto(${photo.id})" class="text-red-500 hover:text-red-700">삭제</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        function toggleHistory(headerElement, itemName) {
-            if(headerElement && headerElement.nextElementSibling && !event.target.classList.contains('more-btn')) {
-                const historyBox = headerElement.nextElementSibling;
-                historyBox.classList.toggle('show');
-                if(historyBox.classList.contains('show')) {
-                    const yearSelect = historyBox.querySelector('.filter-year');
-                    filterItemLogsByMonth(itemName, yearSelect);
-                }
-            }
-        }
-
-        function filterItemLogsByMonth(itemName, selectElement) {
-            const historyBox = selectElement.closest('.history-content');
-            const year = historyBox.querySelector('.filter-year').value;
-            const month = String(historyBox.querySelector('.filter-month').value).padStart(2, '0');
-            const targetPrefix = `${year}-${month}`;
-            const rowsContainer = historyBox.querySelector('.log-rows-container');
-            if(!rowsContainer) return;
-
-            const itemLogs = Array.isArray(globalLogsData) ? globalLogsData.filter(log => log && log.item_name === itemName) : [];
-            let runningStock = 0;
-            const logsWithRunningStock = itemLogs.map(log => {
-                if(log.type === '입고') runningStock += (log.count || 0);
-                if(log.type === '출고') runningStock -= (log.count || 0);
-                return { ...log, currentStockState: runningStock };
-            });
-
-            const sortedWithStock = logsWithRunningStock.reverse();
-            const filteredLogs = sortedWithStock.filter(log => log.created_at && log.created_at.startsWith(targetPrefix));
-
-            let historyHtml = '';
-            if(filteredLogs.length === 0) {
-                historyHtml = `<div style="color:#999; text-align:center; padding:15px; font-size:13px;">기록이 없습니다.</div>`;
+        async function movePhoto(photoId, targetFolderId) {
+            if (!targetFolderId) return;
+            const { error } = await supabase.from('photos').update({ folder_id: targetFolderId }).eq('id', photoId);
+            if (error) {
+                alert('사진 이동 실패: ' + error.message);
             } else {
-                filteredLogs.forEach(log => {
-                    historyHtml += `
-                        <div class="log-rows-container">
-                            <div class="log-row">
-                                <div>
-                                    <span style="font-weight:bold; color:${log.type === '입고' ? '#0d6efd' : '#dc3545'}">[${log.type}]</span> 
-                                    <strong>${log.count}개</strong> 
-                                    <span style="font-size:12px; color:#555;">(${formatDateFull(log.created_at)})</span>
-                                    <span class="running-stock">(재고 ${log.currentStockState}EA)</span>
-                                    ${log.note ? `<div style="font-size:11px; color:#666; margin-top:2px;">메모: ${log.note}</div>` : ''}
-                                </div>
-                                <div class="log-actions" onclick="event.stopPropagation();">
-                                    <button class="sm-edit-btn" onclick="editStockLog(${log.id}, ${log.count}, '${log.note || ''}')">수정</button>
-                                    <button class="btn-danger" style="padding:3px 6px; font-size:11px;" onclick="deleteStockLog(${log.id})">삭제</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
+                loadPhotos();
             }
-            rowsContainer.innerHTML = historyHtml;
+        }
+
+        async function deletePhoto(id) {
+            if (!confirm('사진을 삭제하시겠습니까?')) return;
+            const { error } = await supabase.from('photos').delete().eq('id', id);
+            if (error) {
+                alert('삭제 실패: ' + error.message);
+            } else {
+                loadPhotos();
+            }
         }
     </script>
 </body>
