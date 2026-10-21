@@ -6,7 +6,7 @@
     <title>자재 입출고 관리 시스템 Pro</title>
     <!-- 엑셀 파싱 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- 드래그 앤 드롭 라이브러리 추가 -->
+    <!-- 드래그 앤 드롭 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
@@ -73,9 +73,11 @@
         .note-search-box { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: #fff; }
         .notes-list { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; max-height: 500px; padding-right: 5px; }
         
-        .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; transition: background 0.2s, border 0.2s; cursor: grab; }
-        .note-card:active { cursor: grabbing; }
-        .note-card.pinned { background: #e7f3ff; border-color: #b6d4fe; }
+        .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; transition: background 0.2s, border 0.2s; }
+        .note-card.draggable-item { cursor: grab; }
+        .note-card.draggable-item:active { cursor: grabbing; }
+        .note-card.pinned { background: #e7f3ff; border-color: #b6d4fe; cursor: default; } /* 상단 고정 메모는 커서 기본값 */
+        
         .note-card-header { display: flex; justify-content: space-between; align-items: center; }
         .note-date { font-size: 11px; color: #8c824b; font-weight: 500; }
         .note-card.pinned .note-date { color: #495057; }
@@ -389,7 +391,7 @@
             } catch(e) { alert(e.message); }
         }
 
-        /* 메모장 렌더링 및 드래그 앤 드롭 활성화 */
+        /* 메모장 렌더링 (고정된 메모는 드래그 대상에서 제외) */
         function renderNotes() {
             const listContainer = document.getElementById('notesList');
             const keyword = document.getElementById('noteSearch').value.toLowerCase().trim();
@@ -404,7 +406,7 @@
             
             let filteredNotes = stickyNotes.filter(note => (note.title || '').toLowerCase().includes(keyword) || (note.content || '').toLowerCase().includes(keyword));
             
-            // 사용자 저장 순서 반영
+            // 사용자 순서 적용
             const savedOrder = JSON.parse(localStorage.getItem('local_note_order') || '[]');
             if (savedOrder.length > 0) {
                 filteredNotes.sort((a, b) => {
@@ -416,7 +418,7 @@
                 });
             }
 
-            // 상단 고정(pinned) 항목을 최우선으로 정렬
+            // 상단 고정(pinned) 항목을 맨 위로 우선 배치
             filteredNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
             if(filteredNotes.length === 0) {
@@ -429,7 +431,8 @@
                 const isPinned = !!note.pinned;
                 const isLocked = !!note.is_locked;
 
-                card.className = `note-card ${isPinned ? 'pinned' : ''}`;
+                // 고정되지 않은 일반 메모에만 .draggable-item 클래스 부여
+                card.className = `note-card ${isPinned ? 'pinned' : 'draggable-item'}`;
                 card.setAttribute('data-note-id', note.id);
 
                 card.innerHTML = `
@@ -447,12 +450,13 @@
                 listContainer.appendChild(card);
             });
 
-            // Touch & Drag SortableJS 연결
+            // .draggable-item 클래스를 가진 (고정되지 않은) 메모만 이동 가능하게 지정
             notesSortable = Sortable.create(listContainer, {
+                draggable: '.draggable-item',
                 animation: 150,
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
-                filter: 'input, textarea, button', // 입력창이나 버튼 터치 시 드래그 방지
+                filter: 'input, textarea, button',
                 preventOnFilter: false,
                 onEnd: function() {
                     const cards = listContainer.querySelectorAll('.note-card');
