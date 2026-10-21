@@ -63,7 +63,7 @@
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
 
-        /* 메모장 스타일 개선 */
+        /* 메모장 스타일 업그레이드 */
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
         .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .notepad-title { font-size: 18px; font-weight: bold; color: #202020; }
@@ -72,7 +72,7 @@
         .notes-list { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; max-height: 500px; padding-right: 5px; }
         
         .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; transition: background 0.2s, border 0.2s; }
-        .note-card.pinned { background: #e7f3ff; border-color: #b6d4fe; }
+        .note-card.pinned { background: #e7f3ff; border-color: #b6d4fe; } /* 상단 고정 시 파란 배경 */
         .note-card-header { display: flex; justify-content: space-between; align-items: center; }
         .note-date { font-size: 11px; color: #8c824b; font-weight: 500; }
         .note-card.pinned .note-date { color: #495057; }
@@ -210,13 +210,6 @@
         let globalLogsData = [];
         let collapsedFolders = {}; 
 
-        // 로컬 기기에 고정 및 잠금 설정 저장용 오브젝트
-        let localNoteStates = JSON.parse(localStorage.getItem('local_note_states') || '{}');
-
-        function saveLocalNoteStates() {
-            localStorage.setItem('local_note_states', JSON.stringify(localNoteStates));
-        }
-
         function openTab(tabId) {
             try {
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -329,40 +322,28 @@
             } catch(e) { alert(e.message); }
         }
 
-        /* 공유 메모 불러오기 */
+        /* DB에서 공유 메모 불러오기 (pinned 및 is_locked 포함) */
         async function loadSharedNotes() {
             try {
-                const res = await fetch(`${BASE_URL}/shared_notes?select=id,title,content,date&order=id.desc`, { headers });
+                const res = await fetch(`${BASE_URL}/shared_notes?select=*&order=id.desc`, { headers });
                 if(res.ok) {
                     stickyNotes = await res.json();
                     renderNotes();
-                } else {
-                    document.getElementById('notesList').innerHTML = '<div style="color:red; text-align:center;">메모를 불러올 수 없습니다.</div>';
                 }
             } catch(e) { console.error(e); }
         }
 
-        /* 안전한 메모 생성 (기존 DB 컬럼만 사용) */
+        /* 메모 새로 추가 */
         async function addNewNote() {
             try {
-                const res = await fetch(`${BASE_URL}/shared_notes`, {
-                    method: 'POST', 
-                    headers, 
-                    body: JSON.stringify({ 
-                        title: '', 
-                        content: '', 
-                        date: getFormattedDate() 
-                    })
+                await fetch(`${BASE_URL}/shared_notes`, {
+                    method: 'POST', headers, body: JSON.stringify({ title: '', content: '', date: getFormattedDate(), pinned: false, is_locked: false })
                 });
-                if(res.ok) {
-                    loadSharedNotes();
-                } else {
-                    alert('메모 추가 실패: 서버 응답 오류');
-                }
-            } catch(e) { alert('오류: ' + e.message); }
+                loadSharedNotes();
+            } catch(e) { alert(e.message); }
         }
 
-        /* 메모 수정 */
+        /* 메모 제목/내용 수정 */
         async function updateNote(id, field, value) {
             try {
                 await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, {
@@ -371,20 +352,24 @@
             } catch(e) { console.error(e); }
         }
 
-        /* 📌 상단 고정 토글 */
-        function togglePinNote(id) {
-            if(!localNoteStates[id]) localNoteStates[id] = {};
-            localNoteStates[id].pinned = !localNoteStates[id].pinned;
-            saveLocalNoteStates();
-            renderNotes();
+        /* 📌 상단고정 DB 동기화 */
+        async function togglePinNote(id, currentPinned) {
+            try {
+                await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ pinned: !currentPinned })
+                });
+                loadSharedNotes();
+            } catch(e) { alert(e.message); }
         }
 
-        /* 🔒 잠금 토글 */
-        function toggleLockNote(id) {
-            if(!localNoteStates[id]) localNoteStates[id] = {};
-            localNoteStates[id].is_locked = !localNoteStates[id].is_locked;
-            saveLocalNoteStates();
-            renderNotes();
+        /* 🔒 자물쇠 잠금 DB 동기화 */
+        async function toggleLockNote(id, currentLocked) {
+            try {
+                await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, {
+                    method: 'PATCH', headers, body: JSON.stringify({ is_locked: !currentLocked })
+                });
+                loadSharedNotes();
+            } catch(e) { alert(e.message); }
         }
 
         /* 메모 삭제 */
@@ -392,13 +377,11 @@
             if(!confirm('메모를 삭제하시겠습니까?')) return;
             try {
                 await fetch(`${BASE_URL}/shared_notes?id=eq.${id}`, { method: 'DELETE', headers });
-                delete localNoteStates[id];
-                saveLocalNoteStates();
                 loadSharedNotes();
             } catch(e) { alert(e.message); }
         }
 
-        /* 메모장 화면 정렬 및 렌더링 */
+        /* 메모장 렌더링 (서버 데이터 기반) */
         function renderNotes() {
             const listContainer = document.getElementById('notesList');
             const keyword = document.getElementById('noteSearch').value.toLowerCase().trim();
@@ -407,30 +390,26 @@
             
             let filteredNotes = stickyNotes.filter(note => (note.title || '').toLowerCase().includes(keyword) || (note.content || '').toLowerCase().includes(keyword));
             
-            // 상단 고정(pinned) 항목 우선 정렬
-            filteredNotes.sort((a, b) => {
-                const aPinned = localNoteStates[a.id]?.pinned ? 1 : 0;
-                const bPinned = localNoteStates[b.id]?.pinned ? 1 : 0;
-                return bPinned - aPinned;
-            });
+            // 상단 고정(pinned) 항목을 맨 위로 정렬
+            filteredNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
             if(filteredNotes.length === 0) {
-                listContainer.innerHTML = '<div style="text-align:center; color:#888; font-size:13px; padding:20px;">메모가 없습니다.</div>';
+                listContainer.innerHTML = '<div style="text-align:center; color:#888; font-size:13px; padding:20px;">일치하는 메모가 없습니다.</div>';
                 return;
             }
 
             filteredNotes.forEach(note => {
                 const card = document.createElement('div');
-                const isPinned = !!(localNoteStates[note.id]?.pinned);
-                const isLocked = !!(localNoteStates[note.id]?.is_locked);
+                const isPinned = !!note.pinned;
+                const isLocked = !!note.is_locked; // DB 컬럼명 is_locked 사용
 
                 card.className = `note-card ${isPinned ? 'pinned' : ''}`;
                 card.innerHTML = `
                     <div class="note-card-header">
                         <span class="note-date">${isPinned ? '📌 ' : ''}${note.date || ''}</span>
                         <div class="note-actions">
-                            <button class="note-btn ${isPinned ? 'active' : ''}" onclick="togglePinNote(${note.id})" title="상단 고정">📌</button>
-                            <button class="note-btn" onclick="toggleLockNote(${note.id})" title="${isLocked ? '잠금 해제' : '수정/삭제 잠금'}">${isLocked ? '🔒' : '🔓'}</button>
+                            <button class="note-btn ${isPinned ? 'active' : ''}" onclick="togglePinNote(${note.id}, ${isPinned})" title="상단 고정">📌</button>
+                            <button class="note-btn" onclick="toggleLockNote(${note.id}, ${isLocked})" title="${isLocked ? '수정/삭제 잠김 (클릭 시 해제)' : '수정/삭제 잠금'}">${isLocked ? '🔒' : '🔓'}</button>
                             ${!isLocked ? `<button class="delete-note-btn" onclick="deleteNote(${note.id})" title="삭제">✕</button>` : ''}
                         </div>
                     </div>
