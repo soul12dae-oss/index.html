@@ -6,6 +6,8 @@
     <title>자재 입출고 관리 시스템 Pro</title>
     <!-- 엑셀 파싱 라이브러리 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 드래그 앤 드롭 라이브러리 추가 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 10px; background: #f8f9fa; color: #333; }
         .nav { display: flex; justify-content: space-around; background: #212529; padding: 12px; margin-bottom: 20px; border-radius: 8px; flex-wrap: wrap; gap: 5px; }
@@ -63,7 +65,7 @@
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center; }
         .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #aaa; }
 
-        /* 메모장 스타일 업그레이드 */
+        /* 메모장 드래그 스타일 */
         .notepad-container { background: #f3f3f3; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; min-height: 450px; display: flex; flex-direction: column; }
         .notepad-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .notepad-title { font-size: 18px; font-weight: bold; color: #202020; }
@@ -71,8 +73,9 @@
         .note-search-box { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; margin-bottom: 15px; box-sizing: border-box; background: #fff; }
         .notes-list { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; max-height: 500px; padding-right: 5px; }
         
-        .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; transition: background 0.2s, border 0.2s; }
-        .note-card.pinned { background: #e7f3ff; border-color: #b6d4fe; } /* 상단 고정 시 파란 배경 */
+        .note-card { background: #fff7d1; border: 1px solid #e6db9c; border-radius: 6px; padding: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; display: flex; flex-direction: column; gap: 6px; transition: background 0.2s, border 0.2s; cursor: grab; }
+        .note-card:active { cursor: grabbing; }
+        .note-card.pinned { background: #e7f3ff; border-color: #b6d4fe; }
         .note-card-header { display: flex; justify-content: space-between; align-items: center; }
         .note-date { font-size: 11px; color: #8c824b; font-weight: 500; }
         .note-card.pinned .note-date { color: #495057; }
@@ -85,6 +88,10 @@
         .note-input-title { width: 100%; border: none; background: transparent; font-size: 14px; font-weight: bold; color: #222; outline: none; padding: 0; margin-bottom: 2px; }
         .note-input-content { width: 100%; border: none; background: transparent; font-size: 14px; color: #333; outline: none; resize: none; padding: 0; line-height: 1.4; height: 60px; font-family: inherit; }
         .note-input-title:disabled, .note-input-content:disabled { color: #666; cursor: not-allowed; }
+
+        /* 드래그 애니메이션 효과 */
+        .sortable-ghost { opacity: 0.4; background: #e0e0e0 !important; }
+        .sortable-chosen { box-shadow: 0 8px 15px rgba(0,0,0,0.15) !important; }
 
         .error-box { background: #fff3f2; border: 1px solid #f8d7da; border-radius: 8px; padding: 20px; text-align: center; color: #842029; font-size: 14px; }
     </style>
@@ -209,6 +216,7 @@
         let latestRawItems = [];
         let globalLogsData = [];
         let collapsedFolders = {}; 
+        let notesSortable = null;
 
         function openTab(tabId) {
             try {
@@ -322,7 +330,7 @@
             } catch(e) { alert(e.message); }
         }
 
-        /* DB에서 공유 메모 불러오기 (pinned 및 is_locked 포함) */
+        /* DB에서 공유 메모 불러오기 */
         async function loadSharedNotes() {
             try {
                 const res = await fetch(`${BASE_URL}/shared_notes?select=*&order=id.desc`, { headers });
@@ -381,16 +389,34 @@
             } catch(e) { alert(e.message); }
         }
 
-        /* 메모장 렌더링 (서버 데이터 기반) */
+        /* 메모장 렌더링 및 드래그 앤 드롭 활성화 */
         function renderNotes() {
             const listContainer = document.getElementById('notesList');
             const keyword = document.getElementById('noteSearch').value.toLowerCase().trim();
             if(!listContainer) return;
+            
+            if (notesSortable) {
+                notesSortable.destroy();
+                notesSortable = null;
+            }
+
             listContainer.innerHTML = '';
             
             let filteredNotes = stickyNotes.filter(note => (note.title || '').toLowerCase().includes(keyword) || (note.content || '').toLowerCase().includes(keyword));
             
-            // 상단 고정(pinned) 항목을 맨 위로 정렬
+            // 사용자 저장 순서 반영
+            const savedOrder = JSON.parse(localStorage.getItem('local_note_order') || '[]');
+            if (savedOrder.length > 0) {
+                filteredNotes.sort((a, b) => {
+                    let indexA = savedOrder.indexOf(a.id);
+                    let indexB = savedOrder.indexOf(b.id);
+                    if (indexA === -1) indexA = 999;
+                    if (indexB === -1) indexB = 999;
+                    return indexA - indexB;
+                });
+            }
+
+            // 상단 고정(pinned) 항목을 최우선으로 정렬
             filteredNotes.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
             if(filteredNotes.length === 0) {
@@ -401,9 +427,11 @@
             filteredNotes.forEach(note => {
                 const card = document.createElement('div');
                 const isPinned = !!note.pinned;
-                const isLocked = !!note.is_locked; // DB 컬럼명 is_locked 사용
+                const isLocked = !!note.is_locked;
 
                 card.className = `note-card ${isPinned ? 'pinned' : ''}`;
+                card.setAttribute('data-note-id', note.id);
+
                 card.innerHTML = `
                     <div class="note-card-header">
                         <span class="note-date">${isPinned ? '📌 ' : ''}${note.date || ''}</span>
@@ -417,6 +445,24 @@
                     <textarea class="note-input-content" placeholder="내용..." ${isLocked ? 'disabled' : ''} oninput="updateNote(${note.id}, 'content', this.value)">${note.content || ''}</textarea>
                 `;
                 listContainer.appendChild(card);
+            });
+
+            // Touch & Drag SortableJS 연결
+            notesSortable = Sortable.create(listContainer, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                filter: 'input, textarea, button', // 입력창이나 버튼 터치 시 드래그 방지
+                preventOnFilter: false,
+                onEnd: function() {
+                    const cards = listContainer.querySelectorAll('.note-card');
+                    const newOrder = [];
+                    cards.forEach(card => {
+                        const id = parseInt(card.getAttribute('data-note-id'));
+                        if (id) newOrder.push(id);
+                    });
+                    localStorage.setItem('local_note_order', JSON.stringify(newOrder));
+                }
             });
         }
 
